@@ -29,7 +29,7 @@ class LiveTvActivity : AppCompatActivity() {
 
     private var username = ""
     private var password = ""
-    private val epgCache = mutableMapOf<Int, List<EpgResponseItem>>() // ✅ CACHE EPG
+    private val epgCache = mutableMapOf<Int, List<EpgResponseItem>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,29 +44,23 @@ class LiveTvActivity : AppCompatActivity() {
         username = prefs.getString("username", "") ?: ""
         password = prefs.getString("password", "") ?: ""
 
-        // ✅ OTIMIZAÇÕES RECYCLERVIEW 50% MAIS RÁPIDO
         setupRecyclerViewOptimizations()
-        
         carregarCategorias()
     }
 
     private fun setupRecyclerViewOptimizations() {
-        // Categories
         rvCategories.layoutManager = LinearLayoutManager(this)
         rvCategories.itemAnimator = DefaultItemAnimator()
         rvCategories.setHasFixedSize(true)
         
-        // Channels - OTIMIZADO
         val gridLayoutManager = GridLayoutManager(this, 5)
         rvChannels.layoutManager = gridLayoutManager
         rvChannels.itemAnimator = DefaultItemAnimator()
         rvChannels.setHasFixedSize(true)
         
-        // POOL DE VIEWHOLDERS + PREFETCH
         val recyclerPool = RecyclerView.RecycledViewPool()
         recyclerPool.setMaxRecycledViews(0, 30)
         rvChannels.recycledViewPool = recyclerPool
-        gridLayoutManager.prefetchInitialCount = 20 [web:34][web:19]
     }
 
     private fun carregarCategorias() {
@@ -103,7 +97,7 @@ class LiveTvActivity : AppCompatActivity() {
         tvCategoryTitle.text = categoria.name
         progressBar.visibility = View.VISIBLE
 
-        XtreamApi.service.getLiveStreams(username, password, categoryId = categoria.id)
+        XtreamApi.service.getLiveStreams(username, password, category_id = categoria.id)
             .enqueue(object : Callback<List<LiveStream>> {
                 override fun onResponse(
                     call: Call<List<LiveStream>>,
@@ -112,8 +106,6 @@ class LiveTvActivity : AppCompatActivity() {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
                         val canais = response.body()!!
-                        
-                        // ✅ CARREGA EPG EM PARALELO (3-4 itens por canal)
                         carregarEpgCanais(canais)
                         
                         rvChannels.adapter = ChannelAdapter(canais, epgCache) { canal ->
@@ -133,7 +125,6 @@ class LiveTvActivity : AppCompatActivity() {
             })
     }
 
-    // ✅ NOVO: CARREGA EPG DE TODOS CANAIS (cache)
     private fun carregarEpgCanais(canais: List<LiveStream>) {
         canais.forEach { canal ->
             if (!epgCache.containsKey(canal.id)) {
@@ -147,10 +138,9 @@ class LiveTvActivity : AppCompatActivity() {
                         override fun onFailure(call: Call<List<EpgResponseItem>>, t: Throwable) {}
                     })
             }
-        } [web:44][web:39]
+        }
     }
 
-    // ADAPTERS OTIMIZADOS
     class CategoryAdapter(
         private val list: List<LiveCategory>,
         private val onClick: (LiveCategory) -> Unit
@@ -208,22 +198,21 @@ class LiveTvActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = list[position]
-            holder.tvName.text = "${item.name}\n${getProximaProgramacao(item.id, epgCache)}" // ✅ EPG NA LISTA
+            holder.tvName.text = "${item.name}\n${getProximaProgramacao(item.id, epgCache)}"
 
-            // ✅ GLIDE OTIMIZADO 3X MAIS RÁPIDO
             Glide.with(holder.itemView.context)
                 .load(item.icon)
                 .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                 .thumbnail(0.25f)
                 .placeholder(R.mipmap.ic_launcher)
-                .into(holder.imgLogo) [web:34]
+                .into(holder.imgLogo)
 
             holder.itemView.setOnClickListener { onClick(item) }
         }
 
         private fun getProximaProgramacao(streamId: Int, cache: Map<Int, List<EpgResponseItem>>): String {
             val epg = cache[streamId]?.firstOrNull()
-            return epg?.title ?: "Sem EPG" [web:17]
+            return epg?.title ?: "Carregando EPG..."
         }
 
         override fun getItemCount() = list.size
