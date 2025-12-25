@@ -5,15 +5,22 @@ import android.os.Bundle
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ProgressBar
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SearchActivity : AppCompatActivity() {
 
     private lateinit var etQuery: EditText
     private lateinit var btnDoSearch: ImageButton
     private lateinit var rvResults: RecyclerView
+    private lateinit var progressBar: ProgressBar
     private lateinit var adapter: SearchResultAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,6 +30,10 @@ class SearchActivity : AppCompatActivity() {
         etQuery = findViewById(R.id.etQuery)
         btnDoSearch = findViewById(R.id.btnDoSearch)
         rvResults = findViewById(R.id.rvResults)
+        progressBar = findViewById(R.id.progressBar) // Adicione no layout
+
+        rvResults.layoutManager = LinearLayoutManager(this)
+        rvResults.setHasFixedSize(true)
 
         adapter = SearchResultAdapter(emptyList()) { item ->
             when (item.type) {
@@ -46,8 +57,6 @@ class SearchActivity : AppCompatActivity() {
                 }
             }
         }
-
-        rvResults.layoutManager = LinearLayoutManager(this)
         rvResults.adapter = adapter
 
         btnDoSearch.setOnClickListener { executarBusca() }
@@ -64,100 +73,31 @@ class SearchActivity : AppCompatActivity() {
         val q = etQuery.text.toString().trim()
         if (q.isEmpty()) return
 
+        progressBar.visibility = android.view.View.VISIBLE
+        adapter.updateData(emptyList())
+
         val prefs = getSharedPreferences("vltv_prefs", MODE_PRIVATE)
         val username = prefs.getString("username", "") ?: ""
         val password = prefs.getString("password", "") ?: ""
 
-        val resultados = mutableListOf<SearchResultItem>()
-
-        // 1) Todos os filmes (sem category_id)
-        XtreamApi.service.getAllVodStreams(username, password)
-            .enqueue(object : retrofit2.Callback<List<VodStream>> {
-                override fun onResponse(
-                    call: retrofit2.Call<List<VodStream>>,
-                    response: retrofit2.Response<List<VodStream>>
-                ) {
-                    if (response.isSuccessful && response.body() != null) {
-                        val filmes = response.body()!!
-                        resultados += filmes
-                            .filter { it.name.contains(q, ignoreCase = true) }
-                            .map { vod ->
-                                SearchResultItem(
-                                    id = vod.id,
-                                    title = vod.name,
-                                    type = "movie",
-                                    extraInfo = vod.rating
-                                )
-                            }
+        // ✅ BUSCA REAL Xtream API - live + vod + series EM 1 CHAMADA!
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val resultados = XtreamApi.service.search(username, password, q)
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = android.view.View.GONE
+                    adapter.updateData(resultados)
+                    if (resultados.isEmpty()) {
+                        Toast.makeText(this@SearchActivity, "Nada encontrado para '$q'", Toast.LENGTH_SHORT).show()
                     }
-
-                    // 2) Todas as séries (sem category_id)
-                    XtreamApi.service.getAllSeries(username, password)
-                        .enqueue(object : retrofit2.Callback<List<SeriesStream>> {
-                            override fun onResponse(
-                                call: retrofit2.Call<List<SeriesStream>>,
-                                response: retrofit2.Response<List<SeriesStream>>
-                            ) {
-                                if (response.isSuccessful && response.body() != null) {
-                                    val series = response.body()!!
-                                    resultados += series
-                                        .filter { it.name.contains(q, ignoreCase = true) }
-                                        .map { s ->
-                                            SearchResultItem(
-                                                id = s.id,
-                                                title = s.name,
-                                                type = "series",
-                                                extraInfo = s.rating
-                                            )
-                                        }
-                                }
-                                adapter.updateData(resultados)
-                            }
-
-                            override fun onFailure(
-                                call: retrofit2.Call<List<SeriesStream>>,
-                                t: Throwable
-                            ) {
-                                adapter.updateData(resultados)
-                            }
-                        })
                 }
-
-                override fun onFailure(
-                    call: retrofit2.Call<List<VodStream>>,
-                    t: Throwable
-                ) {
-                    // se filmes falharem, tenta só séries
-                    XtreamApi.service.getAllSeries(username, password)
-                        .enqueue(object : retrofit2.Callback<List<SeriesStream>> {
-                            override fun onResponse(
-                                call: retrofit2.Call<List<SeriesStream>>,
-                                response: retrofit2.Response<List<SeriesStream>>
-                            ) {
-                                if (response.isSuccessful && response.body() != null) {
-                                    val series = response.body()!!
-                                    resultados += series
-                                        .filter { it.name.contains(q, ignoreCase = true) }
-                                        .map { s ->
-                                            SearchResultItem(
-                                                id = s.id,
-                                                title = s.name,
-                                                type = "series",
-                                                extraInfo = s.rating
-                                            )
-                                        }
-                                }
-                                adapter.updateData(resultados)
-                            }
-
-                            override fun onFailure(
-                                call: retrofit2.Call<List<SeriesStream>>,
-                                t: Throwable
-                            ) {
-                                adapter.updateData(emptyList())
-                            }
-                        })
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = android.view.View.GONE
+                    adapter.updateData(emptyList())
+                    Toast.makeText(this@SearchActivity, "Erro na busca: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
-            })
+            }
+        }
     }
 }
