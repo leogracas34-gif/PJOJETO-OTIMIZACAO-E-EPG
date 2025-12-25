@@ -198,11 +198,14 @@ class LiveTvActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = list[position]
+
             holder.tvName.text = item.name
 
+            // Logo com visual mais premium (usa o item_channel.xml que você mandou)
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .placeholder(R.mipmap.ic_launcher)
+                .placeholder(R.drawable.bg_logo_placeholder) // crie um shape/gradient bonito
+                .error(R.drawable.bg_logo_placeholder)
                 .into(holder.imgLogo)
 
             carregarEpg(holder, item)
@@ -226,7 +229,6 @@ class LiveTvActivity : AppCompatActivity() {
                 return
             }
 
-            // ✅ stream_id agora é String
             val epgId = canal.id.toString()
 
             XtreamApi.service.getShortEpg(
