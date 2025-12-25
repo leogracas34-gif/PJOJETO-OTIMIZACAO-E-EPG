@@ -91,6 +91,14 @@
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.VLTVPlay" />
 
+        <!-- ✅ RECEIVER ADICIONADO (atualização app) -->
+        <receiver android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>
