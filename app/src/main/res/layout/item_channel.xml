@@ -4,8 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="2dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="3dp"
     app:cardBackgroundColor="#2A2A2A">
 
     <LinearLayout
@@ -14,15 +14,18 @@
         android:orientation="vertical"
         android:padding="8dp">
 
-        <!-- ✅ LOGO CANAL -->
+        <!-- LOGO CANAL com bordas arredondadas -->
         <ImageView
             android:id="@+id/imgLogo"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="56dp"
             android:scaleType="centerCrop"
-            android:layout_marginBottom="4dp"/>
+            android:adjustViewBounds="true"
+            android:background="@drawable/bg_logo_round"
+            android:padding="4dp"
+            android:layout_marginBottom="4dp" />
 
-        <!-- ✅ NOME CANAL -->
+        <!-- NOME CANAL -->
         <TextView
             android:id="@+id/tvName"
             android:layout_width="match_parent"
@@ -33,9 +36,9 @@
             android:textStyle="bold"
             android:gravity="center"
             android:maxLines="1"
-            android:ellipsize="end"/>
+            android:ellipsize="end" />
 
-        <!-- ✅ AGORA NO AR -->
+        <!-- AGORA NO AR -->
         <TextView
             android:id="@+id/tvNow"
             android:layout_width="match_parent"
@@ -46,9 +49,9 @@
             android:gravity="center"
             android:layout_marginTop="2dp"
             android:maxLines="1"
-            android:ellipsize="end"/>
+            android:ellipsize="end" />
 
-        <!-- ✅ PRÓXIMO PROGRAMA -->
+        <!-- PRÓXIMO PROGRAMA -->
         <TextView
             android:id="@+id/tvNext"
             android:layout_width="match_parent"
@@ -58,7 +61,7 @@
             android:textSize="9sp"
             android:gravity="center"
             android:maxLines="1"
-            android:ellipsize="end"/>
+            android:ellipsize="end" />
 
     </LinearLayout>
 </androidx.cardview.widget.CardView>
