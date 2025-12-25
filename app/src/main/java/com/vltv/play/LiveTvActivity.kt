@@ -3,6 +3,7 @@ package com.vltv.play
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -127,9 +128,7 @@ class LiveTvActivity : AppCompatActivity() {
             })
     }
 
-    // --------------------
-    // ADAPTER DAS CATEGORIAS
-    // --------------------
+    // ADAPTER CATEGORIAS
     class CategoryAdapter(
         private val list: List<LiveCategory>,
         private val onClick: (LiveCategory) -> Unit
@@ -170,9 +169,7 @@ class LiveTvActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
 
-    // --------------------
-    // ADAPTER DOS CANAIS + EPG
-    // --------------------
+    // ADAPTER CANAIS + EPG
     class ChannelAdapter(
         private val list: List<LiveStream>,
         private val username: String,
@@ -208,26 +205,33 @@ class LiveTvActivity : AppCompatActivity() {
             holder.itemView.setOnClickListener { onClick(item) }
         }
 
+        private fun decodeBase64(text: String?): String {
+            return try {
+                if (text.isNullOrEmpty()) "" else String(
+                    Base64.decode(text, Base64.DEFAULT),
+                    Charsets.UTF_8
+                )
+            } catch (e: Exception) {
+                text ?: ""
+            }
+        }
+
         private fun carregarEpg(holder: VH, canal: LiveStream) {
-            // 1) Cache
             epgCache[canal.id]?.let { epg ->
                 mostrarEpg(holder, epg)
                 return
             }
 
-            // 2) Identificador do EPG:
-            //    se o painel usar epg_channel_id, usamos ele;
-            //    senão, caímos para o stream_id numérico.
-            val epgId = canal.epg_channel_id ?: canal.id.toString()
+            val epgId = canal.id.toString()
 
             XtreamApi.service.getShortEpg(username, password, epgId, 2)
-                .enqueue(object : Callback<List<EpgResponseItem>> {
+                .enqueue(object : Callback<EpgWrapper> {
                     override fun onResponse(
-                        call: Call<List<EpgResponseItem>>,
-                        response: Response<List<EpgResponseItem>>
+                        call: Call<EpgWrapper>,
+                        response: Response<EpgWrapper>
                     ) {
-                        if (response.isSuccessful && response.body() != null) {
-                            val epg = response.body()!!
+                        if (response.isSuccessful && response.body()?.epg_listings != null) {
+                            val epg = response.body()!!.epg_listings!!
                             epgCache[canal.id] = epg
                             mostrarEpg(holder, epg)
                         } else {
@@ -236,7 +240,7 @@ class LiveTvActivity : AppCompatActivity() {
                         }
                     }
 
-                    override fun onFailure(call: Call<List<EpgResponseItem>>, t: Throwable) {
+                    override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
                         holder.tvNow.text = "Programação não disponível"
                         holder.tvNext.text = ""
                     }
@@ -245,8 +249,15 @@ class LiveTvActivity : AppCompatActivity() {
 
         private fun mostrarEpg(holder: VH, epg: List<EpgResponseItem>) {
             if (epg.isNotEmpty()) {
-                holder.tvNow.text = epg[0].title ?: "Ao vivo"
-                holder.tvNext.text = if (epg.size > 1) epg[1].title ?: "" else ""
+                val agora = epg[0]
+                holder.tvNow.text = decodeBase64(agora.title)
+
+                if (epg.size > 1) {
+                    val proximo = epg[1]
+                    holder.tvNext.text = decodeBase64(proximo.title)
+                } else {
+                    holder.tvNext.text = ""
+                }
             } else {
                 holder.tvNow.text = "Programação não disponível"
                 holder.tvNext.text = ""
