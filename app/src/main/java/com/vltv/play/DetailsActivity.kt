@@ -149,7 +149,9 @@ class DetailsActivity : AppCompatActivity() {
             }
         }
 
+        // Detalhes do painel Xtream
         carregarDetalhes(streamId)
+        // Complemento do TMDB
         carregarDetalhesTmdb(movieTitle)
     }
 
@@ -157,6 +159,8 @@ class DetailsActivity : AppCompatActivity() {
         super.onResume()
         restaurarEstadoDownload()
     }
+
+    // -------- URL filme --------
 
     private fun montarUrlFilme(): String {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
@@ -192,6 +196,8 @@ class DetailsActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
+    // -------- RESUME --------
+
     private fun configurarBotaoResume() {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val keyBase = "movie_resume_$streamId"
@@ -200,6 +206,8 @@ class DetailsActivity : AppCompatActivity() {
         val existe = pos > 30_000L && dur > 0L && pos < (dur * 0.95).toLong()
         btnResume.visibility = if (existe) Button.VISIBLE else Button.GONE
     }
+
+    // -------- DOWNLOAD --------
 
     private fun getProgressText(): String {
         val progress = DownloadHelper.getDownloadProgress(this, "movie_$streamId")
@@ -241,6 +249,8 @@ class DetailsActivity : AppCompatActivity() {
         setDownloadState(state)
     }
 
+    // -------- FAVORITOS --------
+
     private fun getFavMovies(context: Context): MutableSet<Int> {
         val prefs = context.getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val set = prefs.getStringSet("fav_movies", emptySet()) ?: emptySet()
@@ -259,6 +269,8 @@ class DetailsActivity : AppCompatActivity() {
         btnFavorite.setImageResource(res)
     }
 
+    // -------- DETALHES DO SERVIDOR --------
+
     private fun carregarDetalhes(streamId: Int) {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val username = prefs.getString("username", "") ?: ""
@@ -273,11 +285,24 @@ class DetailsActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body()?.info != null) {
                         val info = response.body()!!.info!!
 
-                        tvPlot.text = info.plot ?: "Sinopse indisponível."
-                        tvGenre.text = "Gênero: ${info.genre ?: "N/A"}"
-                        tvCast.text = "Elenco: ${info.cast ?: "N/A"}"
-                        tvRating.text = "Nota: ${info.rating ?: "N/A"}"
-                        tvDirector.text = "Diretor: ${info.director ?: "N/A"}"
+                        tvPlot.text = info.plot?.takeIf { it.isNotBlank() }
+                            ?: "Sinopse indisponível."
+                        tvGenre.text = "Gênero: ${
+                            info.genre?.takeIf { it.isNotBlank() }
+                                ?: "Informação não disponível"
+                        }"
+                        tvCast.text = "Elenco: ${
+                            info.cast?.takeIf { it.isNotBlank() }
+                                ?: "Informação não disponível"
+                        }"
+                        tvDirector.text = "Diretor: ${
+                            info.director?.takeIf { it.isNotBlank() }
+                                ?: "Informação não disponível"
+                        }"
+                        tvRating.text = "Nota: ${
+                            info.rating?.takeIf { it.isNotBlank() }
+                                ?: "--"
+                        }"
 
                         if (!info.movie_image.isNullOrEmpty()) {
                             Glide.with(this@DetailsActivity)
@@ -285,21 +310,45 @@ class DetailsActivity : AppCompatActivity() {
                                 .into(imgPoster)
                         }
                     } else {
-                        tvPlot.text = "Não foi possível carregar detalhes."
+                        tvPlot.text = "Sinopse indisponível."
+                        tvGenre.text = "Gênero: Informação não disponível"
+                        tvCast.text = "Elenco: Informação não disponível"
+                        tvDirector.text = "Diretor: Informação não disponível"
+                        tvRating.text = "Nota: --"
                     }
                 }
 
                 override fun onFailure(call: Call<VodInfoResponse>, t: Throwable) {
-                    tvPlot.text = "Erro de conexão ao buscar detalhes."
+                    tvPlot.text = "Sinopse indisponível."
+                    tvGenre.text = "Gênero: Informação não disponível"
+                    tvCast.text = "Elenco: Informação não disponível"
+                    tvDirector.text = "Diretor: Informação não disponível"
+                    tvRating.text = "Nota: --"
                 }
             })
+    }
+
+    // -------- TMDB --------
+
+    private fun limparTituloBruto(titulo: String): String {
+        return titulo
+            .replace("\\(.*?\\)".toRegex(), " ")
+            .replace(
+                "(?i)\\b(dublado|legendado|dual audio|bluray|bdrip|remux|1080p|720p|4k|h264|x264|x265)\\b"
+                    .toRegex(),
+                " "
+            )
+            .replace(" +".toRegex(), " ")
+            .trim()
     }
 
     private fun carregarDetalhesTmdb(titulo: String) {
         val apiKey = TmdbConfig.API_KEY
         if (apiKey.isBlank()) return
 
-        TmdbApi.service.searchMovie(apiKey, titulo)
+        val tituloLimpo = limparTituloBruto(titulo)
+
+        TmdbApi.service.searchMovie(apiKey, tituloLimpo)
             .enqueue(object : Callback<TmdbSearchResponse> {
                 override fun onResponse(
                     call: Call<TmdbSearchResponse>,
@@ -307,15 +356,36 @@ class DetailsActivity : AppCompatActivity() {
                 ) {
                     val movie = response.body()?.results?.firstOrNull() ?: return
 
-                    if (tvPlot.text.isNullOrBlank() || tvPlot.text == "Sinopse indisponível.") {
+                    // Sinopse
+                    if (tvPlot.text.isNullOrBlank() ||
+                        tvPlot.text.toString().contains("indisponível", ignoreCase = true)
+                    ) {
                         tvPlot.text = movie.overview ?: "Sinopse indisponível."
                     }
 
-                    if (tvRating.text.isNullOrBlank() || tvRating.text.contains("N/A")) {
+                    // Nota
+                    if (tvRating.text.isNullOrBlank() ||
+                        tvRating.text.toString().contains("--") ||
+                        tvRating.text.toString().contains("N/A", ignoreCase = true)
+                    ) {
                         val nota = movie.vote_average ?: 0f
                         tvRating.text = "Nota: ${String.format("%.1f", nota)}"
                     }
 
+                    // Ano (modelo não tem gêneros, então usa pelo menos o ano)
+                    val ano = movie.release_date?.takeIf { it.length >= 4 }?.substring(0, 4) ?: ""
+                    if (tvGenre.text.isNullOrBlank() ||
+                        tvGenre.text.toString().contains("Informação não disponível") ||
+                        tvGenre.text.toString().contains("...", ignoreCase = true)
+                    ) {
+                        tvGenre.text = if (ano.isNotBlank()) {
+                            "Ano: $ano"
+                        } else {
+                            "Gênero: Informação não disponível"
+                        }
+                    }
+
+                    // Poster TMDB
                     if (movie.poster_path != null) {
                         val urlPoster = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
                         Glide.with(this@DetailsActivity)
@@ -328,6 +398,7 @@ class DetailsActivity : AppCompatActivity() {
                     call: Call<TmdbSearchResponse>,
                     t: Throwable
                 ) {
+                    // silencioso
                 }
             })
     }
