@@ -107,16 +107,29 @@ class LiveTvActivity : AppCompatActivity() {
                             intent.putExtra("channel_name", canal.name)
                             startActivity(intent)
                         }
+                    } else {
+                        Toast.makeText(
+                            this@LiveTvActivity,
+                            "Erro ao carregar canais",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
 
                 override fun onFailure(call: Call<List<LiveStream>>, t: Throwable) {
                     progressBar.visibility = View.GONE
+                    Toast.makeText(
+                        this@LiveTvActivity,
+                        "Falha de conexão",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             })
     }
 
-    // ADAPTERS
+    // --------------------
+    // ADAPTER DAS CATEGORIAS
+    // --------------------
     class CategoryAdapter(
         private val list: List<LiveCategory>,
         private val onClick: (LiveCategory) -> Unit
@@ -157,7 +170,9 @@ class LiveTvActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
 
-    // ✅ CHANNELADAPTER COM EPG REAL (FINAL!)
+    // --------------------
+    // ADAPTER DOS CANAIS + EPG
+    // --------------------
     class ChannelAdapter(
         private val list: List<LiveStream>,
         private val username: String,
@@ -184,27 +199,28 @@ class LiveTvActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            // ✅ LOGO
             Glide.with(holder.itemView.context)
                 .load(item.icon)
                 .placeholder(R.mipmap.ic_launcher)
                 .into(holder.imgLogo)
 
-            // ✅ EPG
             carregarEpg(holder, item)
-
             holder.itemView.setOnClickListener { onClick(item) }
         }
 
         private fun carregarEpg(holder: VH, canal: LiveStream) {
-            // ✅ CACHE
+            // 1) Cache
             epgCache[canal.id]?.let { epg ->
                 mostrarEpg(holder, epg)
                 return
             }
 
-            // ✅ API (CORRIGIDO!)
-            XtreamApi.service.getShortEpg(username, password, canal.id.toString(), 2)
+            // 2) Identificador do EPG:
+            //    se o painel usar epg_channel_id, usamos ele;
+            //    senão, caímos para o stream_id numérico.
+            val epgId = canal.epg_channel_id ?: canal.id.toString()
+
+            XtreamApi.service.getShortEpg(username, password, epgId, 2)
                 .enqueue(object : Callback<List<EpgResponseItem>> {
                     override fun onResponse(
                         call: Call<List<EpgResponseItem>>,
@@ -214,11 +230,15 @@ class LiveTvActivity : AppCompatActivity() {
                             val epg = response.body()!!
                             epgCache[canal.id] = epg
                             mostrarEpg(holder, epg)
+                        } else {
+                            holder.tvNow.text = "Programação não disponível"
+                            holder.tvNext.text = ""
                         }
                     }
 
                     override fun onFailure(call: Call<List<EpgResponseItem>>, t: Throwable) {
-                        // Sem EPG = silencioso
+                        holder.tvNow.text = "Programação não disponível"
+                        holder.tvNext.text = ""
                     }
                 })
         }
@@ -226,13 +246,9 @@ class LiveTvActivity : AppCompatActivity() {
         private fun mostrarEpg(holder: VH, epg: List<EpgResponseItem>) {
             if (epg.isNotEmpty()) {
                 holder.tvNow.text = epg[0].title ?: "Ao vivo"
-                if (epg.size > 1) {
-                    holder.tvNext.text = epg[1].title ?: "Próximo"
-                } else {
-                    holder.tvNext.text = ""
-                }
+                holder.tvNext.text = if (epg.size > 1) epg[1].title ?: "" else ""
             } else {
-                holder.tvNow.text = "Ao vivo"
+                holder.tvNow.text = "Programação não disponível"
                 holder.tvNext.text = ""
             }
         }
