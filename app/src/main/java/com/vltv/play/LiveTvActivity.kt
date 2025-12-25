@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -17,12 +18,14 @@ import com.bumptech.glide.Glide
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import java.text.SimpleDateFormat
+import java.util.*
 
 class LiveTvActivity : AppCompatActivity() {
 
     private lateinit var rvCategories: RecyclerView
     private lateinit var rvChannels: RecyclerView
-    private lateinit var progressBar: View
+    private lateinit var progressBar: ProgressBar
     private lateinit var tvCategoryTitle: TextView
 
     private var username = ""
@@ -98,12 +101,13 @@ class LiveTvActivity : AppCompatActivity() {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
                         val canais = response.body()!!
-                        rvChannels.adapter = ChannelAdapter(canais) { canal ->
+                        // ✅ EPG CARREGA AUTOMATICAMENTE no ChannelAdapter
+                        rvChannels.adapter = ChannelAdapter(canais, username, password) { canal ->
                             val intent = Intent(this@LiveTvActivity, PlayerActivity::class.java)
                             intent.putExtra("stream_id", canal.id)
-                            intent.putExtra("stream_ext", "ts")      // canais geralmente .ts
-                            intent.putExtra("stream_type", "live")   // informa tipo ao player
-                            intent.putExtra("channel_name", canal.name) // NOVO: nome do canal
+                            intent.putExtra("stream_ext", "ts")
+                            intent.putExtra("stream_type", "live")
+                            intent.putExtra("channel_name", canal.name)
                             startActivity(intent)
                         }
                     }
@@ -156,13 +160,20 @@ class LiveTvActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
 
+    // ✅ CHANNELADAPTER COM EPG REAL!
     class ChannelAdapter(
         private val list: List<LiveStream>,
+        private val username: String,
+        private val password: String,
         private val onClick: (LiveStream) -> Unit
     ) : RecyclerView.Adapter<ChannelAdapter.VH>() {
 
+        private val epgCache = mutableMapOf<Int, List<EpgResponseItem>>()
+
         class VH(v: View) : RecyclerView.ViewHolder(v) {
             val tvName: TextView = v.findViewById(R.id.tvName)
+            val tvNow: TextView = v.findViewById(R.id.tvNow)      // ✅ AGORA
+            val tvNext: TextView = v.findViewById(R.id.tvNext)    // ✅ PRÓXIMO
             val imgLogo: ImageView = v.findViewById(R.id.imgLogo)
         }
 
@@ -176,12 +187,55 @@ class LiveTvActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
+            // ✅ CARREGA LOGO
             Glide.with(holder.itemView)
                 .load(item.icon)
                 .placeholder(R.mipmap.ic_launcher)
                 .into(holder.imgLogo)
 
+            // ✅ CARREGA EPG (cache + API)
+            carregarEpg(holder, item)
+
             holder.itemView.setOnClickListener { onClick(item) }
+        }
+
+        private fun carregarEpg(holder: VH, canal: LiveStream) {
+            // ✅ CACHE PRIMEIRO (rápido!)
+            epgCache[canal.id]?.let { epg ->
+                mostrarEpg(holder, epg)
+                return
+            }
+
+            // ✅ API (só se não tem cache)
+            XtreamApi.service.getShortEpg(username, password, canal.id, 2)
+                .enqueue(object : retrofit2.Callback<List<EpgResponseItem>> {
+                    override fun onResponse(
+                        call: retrofit2.Call<List<EpgResponseItem>>,
+                        response: retrofit2.Response<List<EpgResponseItem>>
+                    ) {
+                        if (response.isSuccessful && response.body() != null) {
+                            val epg = response.body()!!
+                            epgCache[canal.id] = epg  // ✅ CACHE
+                            mostrarEpg(holder, epg)
+                        }
+                    }
+
+                    override fun onFailure(call: retrofit2.Call<List<EpgResponseItem>>, t: Throwable) {
+                        // Sem EPG = vazio
+                    }
+                })
+        }
+
+        private fun mostrarEpg(holder: VH, epg: List<EpgResponseItem>) {
+            if (epg.isNotEmpty()) {
+                val agora = epg[0]  // Primeiro = AGORA
+                holder.tvNow.text = agora.title ?: "Ao vivo"
+
+                if (epg.size > 1) {
+                    val proximo = epg[1]
+                    holder.tvNext.text = proximo.title ?: "Próximo"
+                }
+            }
         }
 
         override fun getItemCount() = list.size
