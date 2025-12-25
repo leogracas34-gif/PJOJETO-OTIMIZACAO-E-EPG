@@ -27,8 +27,11 @@ class SearchActivity : AppCompatActivity() {
         adapter = SearchResultAdapter(emptyList()) { item ->
             when (item.type) {
                 "movie" -> {
+                    // abre a mesma tela usada na grade VOD
                     val i = Intent(this, DetailsActivity::class.java)
-                    i.putExtra("movie_id", item.id)
+                    i.putExtra("stream_id", item.id)      // id do VOD
+                    i.putExtra("stream_ext", "mp4")       // ajuste se tiver outra extensão
+                    i.putExtra("title", item.title)       // título do filme
                     startActivity(i)
                 }
                 "series" -> {
