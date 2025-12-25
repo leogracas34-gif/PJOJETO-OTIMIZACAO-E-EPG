@@ -103,15 +103,23 @@ data class VodInfoData(
 )
 
 // --- EPG (guia de programação) ---
+// wrapper porque o servidor manda { "epg_listings": [ ... ] }
+data class EpgWrapper(
+    val epg_listings: List<EpgResponseItem>?
+)
+
 data class EpgResponseItem(
-    val id: Int?,
+    val id: String?,
     val epg_id: String?,
-    val title: String?,
+    val title: String?,          // base64
     val lang: String?,
     val start: String?,
     val end: String?,
-    val description: String?,
-    val channel_id: String?
+    val description: String?,    // base64
+    val channel_id: String?,
+    val start_timestamp: String?,
+    val stop_timestamp: String?,
+    val stop: String?
 )
 
 // ---------------------
@@ -204,15 +212,15 @@ interface XtreamService {
         @Query("series_id") seriesId: Int
     ): Call<SeriesInfoResponse>
 
-    // --- EPG curto para 1 canal ---
+    // --- EPG curto para 1 canal (formato do seu servidor) ---
     @GET("player_api.php")
     fun getShortEpg(
         @Query("username") user: String,
         @Query("password") pass: String,
         @Query("action") action: String = "get_short_epg",
-        @Query("stream_id") streamId: Int,
-        @Query("limit") limit: Int = 1
-    ): Call<List<EpgResponseItem>>
+        @Query("stream_id") streamId: String,
+        @Query("limit") limit: Int = 2
+    ): Call<EpgWrapper>
 }
 
 // ---------------------
