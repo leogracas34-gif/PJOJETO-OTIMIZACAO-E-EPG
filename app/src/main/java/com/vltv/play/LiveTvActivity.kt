@@ -27,8 +27,8 @@ class LiveTvActivity : AppCompatActivity() {
     private lateinit var progressBar: View
     private lateinit var tvCategoryTitle: TextView
 
-    private var username = ""
-    private var password = ""
+    private var username: String = ""
+    private var password: String = ""
     private val epgCache = mutableMapOf<Int, List<EpgResponseItem>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,7 +97,7 @@ class LiveTvActivity : AppCompatActivity() {
         tvCategoryTitle.text = categoria.name
         progressBar.visibility = View.VISIBLE
 
-        XtreamApi.service.getLiveStreams(username, password, category_id = categoria.id)
+        XtreamApi.service.getLiveStreams(username, password, categoria.id)
             .enqueue(object : Callback<List<LiveStream>> {
                 override fun onResponse(
                     call: Call<List<LiveStream>>,
@@ -128,7 +128,7 @@ class LiveTvActivity : AppCompatActivity() {
     private fun carregarEpgCanais(canais: List<LiveStream>) {
         canais.forEach { canal ->
             if (!epgCache.containsKey(canal.id)) {
-                XtreamApi.service.getShortEpg(username, password, canal.id, 4)
+                XtreamApi.service.getShortEpg(username, password, canal.id.toString(), "4")
                     .enqueue(object : Callback<List<EpgResponseItem>> {
                         override fun onResponse(call: Call<List<EpgResponseItem>>, response: Response<List<EpgResponseItem>>) {
                             if (response.isSuccessful && response.body() != null) {
