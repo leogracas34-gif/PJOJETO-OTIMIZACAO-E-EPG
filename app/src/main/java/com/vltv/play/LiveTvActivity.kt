@@ -128,7 +128,9 @@ class LiveTvActivity : AppCompatActivity() {
             })
     }
 
-    // ADAPTER CATEGORIAS
+    // --------------------
+    // ADAPTER DAS CATEGORIAS
+    // --------------------
     class CategoryAdapter(
         private val list: List<LiveCategory>,
         private val onClick: (LiveCategory) -> Unit
@@ -169,7 +171,9 @@ class LiveTvActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
 
-    // ADAPTER CANAIS + EPG
+    // --------------------
+    // ADAPTER DOS CANAIS + EPG
+    // --------------------
     class ChannelAdapter(
         private val list: List<LiveStream>,
         private val username: String,
@@ -222,29 +226,34 @@ class LiveTvActivity : AppCompatActivity() {
                 return
             }
 
+            // ✅ stream_id agora é String
             val epgId = canal.id.toString()
 
-            XtreamApi.service.getShortEpg(username, password, epgId, 2)
-                .enqueue(object : Callback<EpgWrapper> {
-                    override fun onResponse(
-                        call: Call<EpgWrapper>,
-                        response: Response<EpgWrapper>
-                    ) {
-                        if (response.isSuccessful && response.body()?.epg_listings != null) {
-                            val epg = response.body()!!.epg_listings!!
-                            epgCache[canal.id] = epg
-                            mostrarEpg(holder, epg)
-                        } else {
-                            holder.tvNow.text = "Programação não disponível"
-                            holder.tvNext.text = ""
-                        }
-                    }
-
-                    override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
+            XtreamApi.service.getShortEpg(
+                user = username,
+                pass = password,
+                streamId = epgId,
+                limit = 2
+            ).enqueue(object : Callback<EpgWrapper> {
+                override fun onResponse(
+                    call: Call<EpgWrapper>,
+                    response: Response<EpgWrapper>
+                ) {
+                    if (response.isSuccessful && response.body()?.epg_listings != null) {
+                        val epg = response.body()!!.epg_listings!!
+                        epgCache[canal.id] = epg
+                        mostrarEpg(holder, epg)
+                    } else {
                         holder.tvNow.text = "Programação não disponível"
                         holder.tvNext.text = ""
                     }
-                })
+                }
+
+                override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
+                    holder.tvNow.text = "Programação não disponível"
+                    holder.tvNext.text = ""
+                }
+            })
         }
 
         private fun mostrarEpg(holder: VH, epg: List<EpgResponseItem>) {
