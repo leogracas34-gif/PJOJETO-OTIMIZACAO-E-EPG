@@ -10,13 +10,10 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import retrofit2.Callback
+import retrofit2.Response
 
 class SearchActivity : AppCompatActivity() {
-
     private lateinit var etQuery: EditText
     private lateinit var btnDoSearch: ImageButton
     private lateinit var rvResults: RecyclerView
@@ -30,7 +27,7 @@ class SearchActivity : AppCompatActivity() {
         etQuery = findViewById(R.id.etQuery)
         btnDoSearch = findViewById(R.id.btnDoSearch)
         rvResults = findViewById(R.id.rvResults)
-        progressBar = findViewById(R.id.progressBar) // Adicione no layout
+        progressBar = findViewById(R.id.progressBar)
 
         rvResults.layoutManager = LinearLayoutManager(this)
         rvResults.setHasFixedSize(true)
@@ -60,7 +57,6 @@ class SearchActivity : AppCompatActivity() {
         rvResults.adapter = adapter
 
         btnDoSearch.setOnClickListener { executarBusca() }
-
         etQuery.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 executarBusca()
@@ -80,24 +76,24 @@ class SearchActivity : AppCompatActivity() {
         val username = prefs.getString("username", "") ?: ""
         val password = prefs.getString("password", "") ?: ""
 
-        // ✅ BUSCA REAL Xtream API - live + vod + series EM 1 CHAMADA!
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val resultados = XtreamApi.service.search(username, password, q)
-                withContext(Dispatchers.Main) {
-                    progressBar.visibility = android.view.View.GONE
-                    adapter.updateData(resultados)
-                    if (resultados.isEmpty()) {
+        // ✅ BUSCA REAL - 1 chamada (live + vod + series)!
+        XtreamApi.service.search(username, password, q).enqueue(object : Callback<List<SearchResultItem>> {
+            override fun onResponse(call: retrofit2.Call<List<SearchResultItem>>, response: Response<List<SearchResultItem>>) {
+                progressBar.visibility = android.view.View.GONE
+                if (response.isSuccessful && response.body() != null) {
+                    adapter.updateData(response.body()!!)
+                    if (response.body()!!.isEmpty()) {
                         Toast.makeText(this@SearchActivity, "Nada encontrado para '$q'", Toast.LENGTH_SHORT).show()
                     }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    progressBar.visibility = android.view.View.GONE
+                } else {
                     adapter.updateData(emptyList())
-                    Toast.makeText(this@SearchActivity, "Erro na busca: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
+            override fun onFailure(call: retrofit2.Call<List<SearchResultItem>>, t: retrofit2.Callback<*>?) {
+                progressBar.visibility = android.view.View.GONE
+                adapter.updateData(emptyList())
+                Toast.makeText(this@SearchActivity, "Erro na busca", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
 }
