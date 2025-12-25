@@ -164,7 +164,6 @@ interface XtreamService {
         @Query("category_id") categoryId: String
     ): Call<List<VodStream>>
 
-    // todos os filmes, sem category_id
     @GET("player_api.php")
     fun getAllVodStreams(
         @Query("username") user: String,
@@ -196,7 +195,6 @@ interface XtreamService {
         @Query("category_id") categoryId: String
     ): Call<List<SeriesStream>>
 
-    // todas as séries, sem category_id
     @GET("player_api.php")
     fun getAllSeries(
         @Query("username") user: String,
