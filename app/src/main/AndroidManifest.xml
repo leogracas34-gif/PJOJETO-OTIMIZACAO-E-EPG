@@ -18,7 +18,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
 
-        <!-- LOGIN -->
+        <!-- SUAS ACTIVITIES (IGUAIS) -->
         <activity
             android:name=".LoginActivity"
             android:exported="true"
@@ -31,68 +31,21 @@
             </intent-filter>
         </activity>
 
-        <!-- HOME -->
-        <activity
-            android:name=".HomeActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".HomeActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".LiveTvActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".PlayerActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".VodActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".DetailsActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".SeriesActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".SeriesDetailsActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".SearchActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".SettingsActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
+        <activity android:name=".DownloadsActivity" android:screenOrientation="sensorLandscape" android:theme="@style/Theme.VLTVPlay" />
 
-        <!-- TV AO VIVO -->
-        <activity
-            android:name=".LiveTvActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- PLAYER (CANAIS / FILMES / SÉRIES) -->
-        <activity
-            android:name=".PlayerActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- FILMES (VOD) -->
-        <activity
-            android:name=".VodActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- DETALHES DO FILME -->
-        <activity
-            android:name=".DetailsActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- LISTA DE SÉRIES -->
-        <activity
-            android:name=".SeriesActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- DETALHES / EPISÓDIOS DA SÉRIE -->
-        <activity
-            android:name=".SeriesDetailsActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- BUSCA GERAL (LUPA) -->
-        <activity
-            android:name=".SearchActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- CONFIGURAÇÕES / CONTROLE PARENTAL -->
-        <activity
-            android:name=".SettingsActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- MEUS DOWNLOADS -->
-        <activity
-            android:name=".DownloadsActivity"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.VLTVPlay" />
-
-        <!-- ✅ RECEIVER ADICIONADO (atualização app) -->
-        <receiver android:exported="false">
+        <!-- ✅ RECEIVER CORRIGIDO -->
+        <receiver 
+            android:name=".AppUpdateReceiver"
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_REPLACED" />
                 <data android:scheme="package" />
