@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
@@ -48,7 +49,6 @@ class PlayerActivity : AppCompatActivity() {
     private var nextChannelName: String? = null
     private var startPositionMs: Long = 0L
 
-    // para offline
     private var offlineUri: String? = null
 
     private val serverList = listOf(
@@ -91,14 +91,13 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
-        
-        // === FULLSCREEN MODE - REMOVE BARRA DE STATUS (BATERIA/RELÓGIO) ===
-        window.decorView.systemUiVisibility = 
+
+        // FULLSCREEN
+        window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-        // ==================================================================
-        
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+
         playerView = findViewById(R.id.playerView)
         loading = findViewById(R.id.loading)
         tvChannelName = findViewById(R.id.tvChannelName)
@@ -117,7 +116,6 @@ class PlayerActivity : AppCompatActivity() {
         nextStreamId = intent.getIntExtra("next_stream_id", 0)
         nextChannelName = intent.getStringExtra("next_channel_name")
 
-        // offline
         offlineUri = intent.getStringExtra("offline_uri")
 
         val channelName = intent.getStringExtra("channel_name") ?: ""
@@ -178,18 +176,15 @@ class PlayerActivity : AppCompatActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            // === MANTÉM FULLSCREEN EM ANDROID 11+ ===
-            window.decorView.systemUiVisibility = 
+            window.decorView.systemUiVisibility =
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            // =======================================
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
         }
     }
 
     @OptIn(UnstableApi::class)
     private fun iniciarPlayer() {
-        // modo offline: ignora servidores
         if (streamType == "vod_offline") {
             val uriStr = offlineUri
             if (uriStr.isNullOrBlank()) {
@@ -199,7 +194,6 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             player?.release()
-
             player = ExoPlayer.Builder(this).build()
             playerView.player = player
 
@@ -227,7 +221,6 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
 
-        // fluxo normal (live / movie / series)
         if (extIndex >= extensoesTentativa.size) {
             serverIndex++
             extIndex = 0
@@ -331,8 +324,6 @@ class PlayerActivity : AppCompatActivity() {
         finish()
     }
 
-    // ------- RESUME FILMES -------
-
     private fun getMovieKey(id: Int) = "movie_resume_$id"
 
     private fun saveMovieResume(id: Int, positionMs: Long, durationMs: Long) {
@@ -356,8 +347,6 @@ class PlayerActivity : AppCompatActivity() {
             .remove("${getMovieKey(id)}_dur")
             .apply()
     }
-
-    // ------- RESUME EPISÓDIOS -------
 
     private fun getSeriesKey(episodeStreamId: Int) = "series_resume_$episodeStreamId"
 
@@ -385,6 +374,17 @@ class PlayerActivity : AppCompatActivity() {
 
     // ------- EPG live -------
 
+    private fun decodeBase64(text: String?): String {
+        return try {
+            if (text.isNullOrEmpty()) "" else String(
+                Base64.decode(text, Base64.DEFAULT),
+                Charsets.UTF_8
+            )
+        } catch (e: Exception) {
+            text ?: ""
+        }
+    }
+
     private fun carregarEpg() {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val user = prefs.getString("username", "") ?: ""
@@ -395,30 +395,33 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
 
+        val streamIdString = streamId.toString()
+
         XtreamApi.service.getShortEpg(
             user = user,
             pass = pass,
-            streamId = streamId,
-            limit = 1
-        ).enqueue(object : Callback<List<EpgResponseItem>> {
+            streamId = streamIdString,
+            limit = 2
+        ).enqueue(object : Callback<EpgWrapper> {
             override fun onResponse(
-                call: Call<List<EpgResponseItem>>,
-                response: Response<List<EpgResponseItem>>
+                call: Call<EpgWrapper>,
+                response: Response<EpgWrapper>
             ) {
-                if (!response.isSuccessful) {
+                if (!response.isSuccessful || response.body()?.epg_listings.isNullOrEmpty()) {
                     tvNowPlaying.text = "Sem informação de programação"
                     return
                 }
 
-                val epg = response.body()?.firstOrNull()
+                val list = response.body()!!.epg_listings!!
+                val epg = list.firstOrNull()
                 if (epg == null || epg.title.isNullOrBlank()) {
                     tvNowPlaying.text = "Sem informação de programação"
                     return
                 }
 
-                val titulo = epg.title ?: ""
+                val titulo = decodeBase64(epg.title)
                 val inicio = epg.start ?: ""
-                val fim = epg.end ?: ""
+                val fim = epg.stop ?: epg.end.orEmpty()
                 val textoHora = if (inicio.isNotBlank() && fim.isNotBlank()) {
                     " ($inicio - $fim)"
                 } else ""
@@ -426,7 +429,7 @@ class PlayerActivity : AppCompatActivity() {
                 tvNowPlaying.text = "$titulo$textoHora"
             }
 
-            override fun onFailure(call: Call<List<EpgResponseItem>>, t: Throwable) {
+            override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
                 tvNowPlaying.text = "Falha ao carregar programação"
             }
         })
