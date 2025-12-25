@@ -68,6 +68,15 @@ data class SeriesStream(
     val icon: String? get() = cover
 }
 
+// ✅ MODEL PARA BUSCA (live + vod + series)
+data class SearchResultItem(
+    val id: Int,
+    val title: String,
+    val type: String, // "live", "movie", "series"
+    val icon: String?,
+    val extraInfo: String? = null
+)
+
 data class SeriesInfoResponse(
     val episodes: Map<String, List<EpisodeStream>>?
 )
@@ -213,6 +222,15 @@ interface XtreamService {
         @Query("stream_id") streamId: Int,
         @Query("limit") limit: Int = 1
     ): Call<List<EpgResponseItem>>
+
+    // ✅ ENDPOINT SEARCH NATIVE XTREAM (live + vod + series)
+    @GET("player_api.php")
+    fun search(
+        @Query("username") user: String,
+        @Query("password") pass: String,
+        @Query("action") action: String = "search",
+        @Query("query") query: String
+    ): Call<List<SearchResultItem>>
 }
 
 // ---------------------
