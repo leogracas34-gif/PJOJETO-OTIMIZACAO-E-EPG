@@ -11,9 +11,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 
-class SearchResultAdapter(
-    private val onClick: (SearchResultItem) -> Unit
-) : ListAdapter<SearchResultItem, SearchResultAdapter.VH>(SearchDiffCallback()) {
+class SearchResultAdapter(private val onClick: (SearchResultItem) -> Unit) : 
+    ListAdapter<SearchResultItem, SearchResultAdapter.VH>(SearchDiffCallback()) {
 
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvTitle: TextView = v.findViewById(R.id.tvResultTitle)
@@ -23,8 +22,7 @@ class SearchResultAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_search_result, parent, false)
+        val v = LayoutInflater.from(parent.context).inflate(R.layout.item_search_result, parent, false)
         return VH(v)
     }
 
@@ -39,10 +37,9 @@ class SearchResultAdapter(
         }
         holder.tvExtra.text = item.extraInfo ?: ""
         
-        // ✅ GLIDE otimizado + cantos arredondados
         Glide.with(holder.itemView)
             .load(item.icon)
-            .placeholder(R.drawable.placeholder_poster)
+            .placeholder(android.R.color.darker_gray)
             .transform(RoundedCorners(12))
             .into(holder.imgPoster)
 
