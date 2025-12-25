@@ -99,7 +99,6 @@ class LiveTvActivity : AppCompatActivity() {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
                         val canais = response.body()!!
-                        // ✅ EPG CARREGA AUTOMATICAMENTE no ChannelAdapter
                         rvChannels.adapter = ChannelAdapter(canais, username, password) { canal ->
                             val intent = Intent(this@LiveTvActivity, PlayerActivity::class.java)
                             intent.putExtra("stream_id", canal.id)
@@ -158,7 +157,7 @@ class LiveTvActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
 
-    // ✅ CHANNELADAPTER COM EPG REAL (CORRIGIDO!)
+    // ✅ CHANNELADAPTER COM EPG REAL (FINAL!)
     class ChannelAdapter(
         private val list: List<LiveStream>,
         private val username: String,
@@ -191,7 +190,7 @@ class LiveTvActivity : AppCompatActivity() {
                 .placeholder(R.mipmap.ic_launcher)
                 .into(holder.imgLogo)
 
-            // ✅ EPG (corrigido stream_id como String)
+            // ✅ EPG
             carregarEpg(holder, item)
 
             holder.itemView.setOnClickListener { onClick(item) }
@@ -204,12 +203,12 @@ class LiveTvActivity : AppCompatActivity() {
                 return
             }
 
-            // ✅ API (stream_id.toString() = CORREÇÃO!)
+            // ✅ API (CORRIGIDO!)
             XtreamApi.service.getShortEpg(username, password, canal.id.toString(), 2)
-                .enqueue(object : retrofit2.Callback<List<EpgResponseItem>> {
+                .enqueue(object : Callback<List<EpgResponseItem>> {
                     override fun onResponse(
-                        call: retrofit2.Call<List<EpgResponseItem>>,
-                        response: retrofit2.Response<List<EpgResponseItem>>
+                        call: Call<List<EpgResponseItem>>,
+                        response: Response<List<EpgResponseItem>>
                     ) {
                         if (response.isSuccessful && response.body() != null) {
                             val epg = response.body()!!
@@ -218,8 +217,8 @@ class LiveTvActivity : AppCompatActivity() {
                         }
                     }
 
-                    override fun onFailure(call: retrofit2.Call<List<EpgResponseItem>>, t: retrofit2.HttpException) {
-                        // Sem EPG
+                    override fun onFailure(call: Call<List<EpgResponseItem>>, t: Throwable) {
+                        // Sem EPG = silencioso
                     }
                 })
         }
@@ -229,7 +228,12 @@ class LiveTvActivity : AppCompatActivity() {
                 holder.tvNow.text = epg[0].title ?: "Ao vivo"
                 if (epg.size > 1) {
                     holder.tvNext.text = epg[1].title ?: "Próximo"
+                } else {
+                    holder.tvNext.text = ""
                 }
+            } else {
+                holder.tvNow.text = "Ao vivo"
+                holder.tvNext.text = ""
             }
         }
 
