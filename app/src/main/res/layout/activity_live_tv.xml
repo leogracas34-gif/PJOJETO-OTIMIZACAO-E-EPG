@@ -26,22 +26,7 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- BARRA DE BUSCA LOCAL -->
-        <EditText
-            android:id="@+id/etSearchList"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_search_rounded"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:hint="Buscar nesta categoria"
-            android:textColor="@color/white"
-            android:textColorHint="#AAAAAA"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
-            android:maxLines="1"
-            android:layout_marginBottom="12dp" />
-
+        <!-- TÍTULO DA CATEGORIA -->
         <TextView
             android:id="@+id/tvCategoryTitle"
             android:layout_width="wrap_content"
