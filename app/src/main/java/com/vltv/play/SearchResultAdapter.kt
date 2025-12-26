@@ -20,7 +20,7 @@ class SearchResultAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_vod, parent, false) // mesmo card de filmes/séries
+            .inflate(R.layout.item_vod, parent, false)
         return VH(v)
     }
 
@@ -28,9 +28,8 @@ class SearchResultAdapter(
         val item = list[position]
         holder.tvName.text = item.title
 
-        // Por enquanto usa só o ícone padrão; depois dá para passar URL em SearchResultItem
         Glide.with(holder.itemView.context)
-            .load(R.mipmap.ic_launcher) // troque para item.iconUrl quando tiver
+            .load(item.iconUrl ?: R.mipmap.ic_launcher)
             .placeholder(R.mipmap.ic_launcher)
             .into(holder.imgPoster)
 
