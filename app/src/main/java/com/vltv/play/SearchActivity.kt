@@ -56,11 +56,9 @@ class SearchActivity : AppCompatActivity() {
             }
         }
 
-        // AGORA EM GRID
         rvResults.layoutManager = GridLayoutManager(this, 5)
         rvResults.adapter = adapter
 
-        // Texto vindo da HomeActivity
         val initial = intent.getStringExtra("initial_query")
         if (!initial.isNullOrBlank()) {
             etQuery.setText(initial)
@@ -92,12 +90,11 @@ class SearchActivity : AppCompatActivity() {
 
         val resultados = mutableListOf<SearchResultItem>()
 
-        // estado inicial
         tvEmpty.visibility = View.GONE
         progressBar.visibility = View.VISIBLE
         adapter.updateData(emptyList())
 
-        // 1) FILMES (todos)
+        // 1) FILMES
         XtreamApi.service.getAllVodStreams(username, password)
             .enqueue(object : retrofit2.Callback<List<VodStream>> {
                 override fun onResponse(
@@ -116,12 +113,13 @@ class SearchActivity : AppCompatActivity() {
                                     id = vod.id,
                                     title = vod.title ?: vod.name,
                                     type = "movie",
-                                    extraInfo = vod.rating
+                                    extraInfo = vod.rating,
+                                    iconUrl = vod.icon
                                 )
                             }
                     }
 
-                    // 2) SÉRIES (todas)
+                    // 2) SÉRIES
                     XtreamApi.service.getAllSeries(username, password)
                         .enqueue(object : retrofit2.Callback<List<SeriesStream>> {
                             override fun onResponse(
@@ -139,12 +137,13 @@ class SearchActivity : AppCompatActivity() {
                                                 id = s.id,
                                                 title = s.name,
                                                 type = "series",
-                                                extraInfo = s.rating
+                                                extraInfo = s.rating,
+                                                iconUrl = s.icon
                                             )
                                         }
                                 }
 
-                                // 3) Canais ao vivo (todos)
+                                // 3) CANAIS
                                 buscarCanais(username, password, qNorm, resultados)
                             }
 
@@ -179,7 +178,8 @@ class SearchActivity : AppCompatActivity() {
                                                 id = s.id,
                                                 title = s.name,
                                                 type = "series",
-                                                extraInfo = s.rating
+                                                extraInfo = s.rating,
+                                                iconUrl = s.icon
                                             )
                                         }
                                 }
@@ -220,7 +220,8 @@ class SearchActivity : AppCompatActivity() {
                                     id = c.id,
                                     title = c.name,
                                     type = "live",
-                                    extraInfo = null
+                                    extraInfo = null,
+                                    iconUrl = c.stream_icon
                                 )
                             }
                     }
