@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -32,6 +33,14 @@ class VodActivity : AppCompatActivity() {
     private var password = ""
     private lateinit var prefs: SharedPreferences
 
+    // Cache em memória
+    private var cachedCategories: List<LiveCategory>? = null
+    private val moviesCache = mutableMapOf<String, List<VodStream>>() // key = categoryId
+    private var favMoviesCache: List<VodStream>? = null
+
+    private var categoryAdapter: VodCategoryAdapter? = null
+    private var moviesAdapter: VodAdapter? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_tv)
@@ -45,8 +54,11 @@ class VodActivity : AppCompatActivity() {
         username = prefs.getString("username", "") ?: ""
         password = prefs.getString("password", "") ?: ""
 
-        rvCategories.layoutManager = LinearLayoutManager(this)
+        rvCategories.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
+        rvCategories.setHasFixedSize(true)
+
         rvMovies.layoutManager = GridLayoutManager(this, 5)
+        rvMovies.setHasFixedSize(true)
 
         carregarCategorias()
     }
@@ -63,6 +75,12 @@ class VodActivity : AppCompatActivity() {
     }
 
     private fun carregarCategorias() {
+        // Usa cache se já tiver
+        cachedCategories?.let { categoriasCacheadas ->
+            aplicarCategorias(categoriasCacheadas)
+            return
+        }
+
         progressBar.visibility = View.VISIBLE
 
         XtreamApi.service.getVodCategories(username, password)
@@ -84,6 +102,9 @@ class VodActivity : AppCompatActivity() {
                         )
                         categorias.addAll(originais)
 
+                        // cache bruto
+                        cachedCategories = categorias
+
                         // se controle parental ligado, remove categorias adultas
                         if (ParentalControlManager.isEnabled(this@VodActivity)) {
                             categorias = categorias.filterNot { cat ->
@@ -91,23 +112,7 @@ class VodActivity : AppCompatActivity() {
                             }.toMutableList()
                         }
 
-                        rvCategories.adapter = VodCategoryAdapter(categorias) { categoria ->
-                            if (categoria.id == "FAV") {
-                                carregarFilmesFavoritos()
-                            } else {
-                                carregarFilmes(categoria)
-                            }
-                        }
-
-                        val primeiraCategoriaNormal =
-                            categorias.firstOrNull { it.id != "FAV" }
-
-                        if (primeiraCategoriaNormal != null) {
-                            carregarFilmes(primeiraCategoriaNormal)
-                        } else {
-                            tvCategoryTitle.text = "FAVORITOS"
-                            carregarFilmesFavoritos()
-                        }
+                        aplicarCategorias(categorias)
                     } else {
                         Toast.makeText(
                             this@VodActivity,
@@ -128,8 +133,52 @@ class VodActivity : AppCompatActivity() {
             })
     }
 
+    private fun aplicarCategorias(categorias: List<LiveCategory>) {
+        if (categorias.isEmpty()) {
+            Toast.makeText(this, "Nenhuma categoria disponível.", Toast.LENGTH_SHORT).show()
+            rvCategories.adapter = VodCategoryAdapter(emptyList()) {}
+            rvMovies.adapter = VodAdapter(emptyList(), {}, {})
+            return
+        }
+
+        if (categoryAdapter == null) {
+            categoryAdapter = VodCategoryAdapter(categorias) { categoria ->
+                if (categoria.id == "FAV") {
+                    carregarFilmesFavoritos()
+                } else {
+                    carregarFilmes(categoria)
+                }
+            }
+            rvCategories.adapter = categoryAdapter
+        } else {
+            categoryAdapter = VodCategoryAdapter(categorias) { categoria ->
+                if (categoria.id == "FAV") {
+                    carregarFilmesFavoritos()
+                } else {
+                    carregarFilmes(categoria)
+                }
+            }
+            rvCategories.adapter = categoryAdapter
+        }
+
+        val primeiraCategoriaNormal = categorias.firstOrNull { it.id != "FAV" }
+        if (primeiraCategoriaNormal != null) {
+            carregarFilmes(primeiraCategoriaNormal)
+        } else {
+            tvCategoryTitle.text = "FAVORITOS"
+            carregarFilmesFavoritos()
+        }
+    }
+
     private fun carregarFilmes(categoria: LiveCategory) {
         tvCategoryTitle.text = categoria.name
+
+        // cache por categoria
+        moviesCache[categoria.id]?.let { filmesCacheados ->
+            aplicarFilmes(filmesCacheados)
+            return
+        }
+
         progressBar.visibility = View.VISIBLE
 
         XtreamApi.service.getVodStreams(username, password, categoryId = categoria.id)
@@ -142,17 +191,15 @@ class VodActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         var filmes = response.body()!!
 
+                        moviesCache[categoria.id] = filmes
+
                         if (ParentalControlManager.isEnabled(this@VodActivity)) {
                             filmes = filmes.filterNot { vod ->
                                 isAdultName(vod.name) || isAdultName(vod.title)
                             }
                         }
 
-                        rvMovies.adapter = VodAdapter(
-                            filmes,
-                            onClick = { filme -> abrirDetalhes(filme) },
-                            onDownloadClick = { filme -> mostrarMenuDownload(filme) }
-                        )
+                        aplicarFilmes(filmes)
                     }
                 }
 
@@ -164,16 +211,19 @@ class VodActivity : AppCompatActivity() {
 
     private fun carregarFilmesFavoritos() {
         tvCategoryTitle.text = "FAVORITOS"
+
+        // usa cache se já montou uma vez
+        favMoviesCache?.let { favoritosCacheados ->
+            aplicarFilmes(favoritosCacheados)
+            return
+        }
+
         progressBar.visibility = View.VISIBLE
 
         val favIds = getFavMovies(this)
         if (favIds.isEmpty()) {
             progressBar.visibility = View.GONE
-            rvMovies.adapter = VodAdapter(
-                emptyList(),
-                onClick = {},
-                onDownloadClick = { }
-            )
+            aplicarFilmes(emptyList())
             Toast.makeText(this, "Nenhum filme favorito.", Toast.LENGTH_SHORT).show()
             return
         }
@@ -195,11 +245,8 @@ class VodActivity : AppCompatActivity() {
                             }
                         }
 
-                        rvMovies.adapter = VodAdapter(
-                            todos,
-                            onClick = { filme -> abrirDetalhes(filme) },
-                            onDownloadClick = { filme -> mostrarMenuDownload(filme) }
-                        )
+                        favMoviesCache = todos
+                        aplicarFilmes(todos)
                     }
                 }
 
@@ -207,6 +254,24 @@ class VodActivity : AppCompatActivity() {
                     progressBar.visibility = View.GONE
                 }
             })
+    }
+
+    private fun aplicarFilmes(filmes: List<VodStream>) {
+        if (moviesAdapter == null) {
+            moviesAdapter = VodAdapter(
+                filmes,
+                onClick = { filme -> abrirDetalhes(filme) },
+                onDownloadClick = { filme -> mostrarMenuDownload(filme) }
+            )
+            rvMovies.adapter = moviesAdapter
+        } else {
+            moviesAdapter = VodAdapter(
+                filmes,
+                onClick = { filme -> abrirDetalhes(filme) },
+                onDownloadClick = { filme -> mostrarMenuDownload(filme) }
+            )
+            rvMovies.adapter = moviesAdapter
+        }
     }
 
     private fun abrirDetalhes(filme: VodStream) {
@@ -244,18 +309,22 @@ class VodActivity : AppCompatActivity() {
                     iniciarDownloadReal(filme)
                     true
                 }
+
                 R.id.action_pause -> {
                     pausarDownload(filme.id)
                     true
                 }
+
                 R.id.action_cancel -> {
                     cancelarDownload(filme.id)
                     true
                 }
+
                 R.id.action_meus_downloads -> {
                     abrirDownloadsPremium(filme)
                     true
                 }
+
                 else -> false
             }
         }
@@ -361,9 +430,12 @@ class VodActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            Glide.with(holder.itemView)
+            Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .placeholder(R.mipmap.ic_launcher)
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .placeholder(R.drawable.bg_logo_placeholder)
+                .error(R.drawable.bg_logo_placeholder)
+                .centerCrop()
                 .into(holder.imgPoster)
 
             holder.itemView.setOnClickListener { onClick(item) }
