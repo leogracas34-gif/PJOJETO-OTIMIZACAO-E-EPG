@@ -47,6 +47,17 @@ class SeriesActivity : AppCompatActivity() {
         carregarCategorias()
     }
 
+    // -------- helper p/ detectar adulto --------
+    private fun isAdultName(name: String?): Boolean {
+        if (name.isNullOrBlank()) return false
+        val n = name.lowercase()
+        return n.contains("+18") ||
+                n.contains("adult") ||
+                n.contains("xxx") ||
+                n.contains("hot") ||
+                n.contains("sexo")
+    }
+
     private fun carregarCategorias() {
         progressBar.visibility = View.VISIBLE
 
@@ -60,7 +71,7 @@ class SeriesActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         val originais = response.body()!!
 
-                        val categorias = mutableListOf<LiveCategory>()
+                        var categorias = mutableListOf<LiveCategory>()
                         categorias.add(
                             LiveCategory(
                                 category_id = "FAV_SERIES",
@@ -68,6 +79,13 @@ class SeriesActivity : AppCompatActivity() {
                             )
                         )
                         categorias.addAll(originais)
+
+                        // se controle parental ligado, remove categorias adultas
+                        if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
+                            categorias = categorias.filterNot { cat ->
+                                isAdultName(cat.name)
+                            }.toMutableList()
+                        }
 
                         rvCategories.adapter = SeriesCategoryAdapter(categorias) { categoria ->
                             if (categoria.id == "FAV_SERIES") {
@@ -77,8 +95,11 @@ class SeriesActivity : AppCompatActivity() {
                             }
                         }
 
-                        if (categorias.size > 1) {
-                            carregarSeries(categorias[1])
+                        val primeiraCategoriaNormal =
+                            categorias.firstOrNull { it.id != "FAV_SERIES" }
+
+                        if (primeiraCategoriaNormal != null) {
+                            carregarSeries(primeiraCategoriaNormal)
                         } else {
                             tvCategoryTitle.text = "FAVORITOS"
                             carregarSeriesFavoritas()
@@ -115,7 +136,15 @@ class SeriesActivity : AppCompatActivity() {
                 ) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
-                        rvSeries.adapter = SeriesAdapter(response.body()!!) { serie ->
+                        var series = response.body()!!
+
+                        if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
+                            series = series.filterNot { s ->
+                                isAdultName(s.name)
+                            }
+                        }
+
+                        rvSeries.adapter = SeriesAdapter(series) { serie ->
                             abrirDetalhesSerie(serie)
                         }
                     }
@@ -147,9 +176,16 @@ class SeriesActivity : AppCompatActivity() {
                 ) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
-                        val todas = response.body()!!
-                        val apenasFav = todas.filter { favIds.contains(it.id) }
-                        rvSeries.adapter = SeriesAdapter(apenasFav) { serie ->
+                        var todas = response.body()!!
+                        todas = todas.filter { favIds.contains(it.id) }
+
+                        if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
+                            todas = todas.filterNot { s ->
+                                isAdultName(s.name)
+                            }
+                        }
+
+                        rvSeries.adapter = SeriesAdapter(todas) { serie ->
                             abrirDetalhesSerie(serie)
                         }
                     }
