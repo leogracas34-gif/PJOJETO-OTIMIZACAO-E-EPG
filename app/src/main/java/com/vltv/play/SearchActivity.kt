@@ -2,9 +2,12 @@ package com.vltv.play
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -15,6 +18,8 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var btnDoSearch: ImageButton
     private lateinit var rvResults: RecyclerView
     private lateinit var adapter: SearchResultAdapter
+    private lateinit var progressBar: ProgressBar
+    private lateinit var tvEmpty: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,6 +28,8 @@ class SearchActivity : AppCompatActivity() {
         etQuery = findViewById(R.id.etQuery)
         btnDoSearch = findViewById(R.id.btnDoSearch)
         rvResults = findViewById(R.id.rvResults)
+        progressBar = findViewById(R.id.progressBar)
+        tvEmpty = findViewById(R.id.tvEmpty)
 
         adapter = SearchResultAdapter(emptyList()) { item ->
             when (item.type) {
@@ -83,6 +90,11 @@ class SearchActivity : AppCompatActivity() {
         val password = prefs.getString("password", "") ?: ""
 
         val resultados = mutableListOf<SearchResultItem>()
+
+        // estado inicial
+        tvEmpty.visibility = View.GONE
+        progressBar.visibility = View.VISIBLE
+        adapter.updateData(emptyList())
 
         // 1) FILMES (todos)
         XtreamApi.service.getAllVodStreams(username, password)
@@ -211,14 +223,20 @@ class SearchActivity : AppCompatActivity() {
                                 )
                             }
                     }
+                    progressBar.visibility = View.GONE
                     adapter.updateData(resultados)
+                    tvEmpty.visibility =
+                        if (resultados.isEmpty()) View.VISIBLE else View.GONE
                 }
 
                 override fun onFailure(
                     call: retrofit2.Call<List<LiveStream>>,
                     t: Throwable
                 ) {
+                    progressBar.visibility = View.GONE
                     adapter.updateData(resultados)
+                    tvEmpty.visibility =
+                        if (resultados.isEmpty()) View.VISIBLE else View.GONE
                 }
             })
     }
