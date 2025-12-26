@@ -52,6 +52,13 @@ class SearchActivity : AppCompatActivity() {
         rvResults.layoutManager = LinearLayoutManager(this)
         rvResults.adapter = adapter
 
+        // Texto vindo da HomeActivity
+        val initial = intent.getStringExtra("initial_query")
+        if (!initial.isNullOrBlank()) {
+            etQuery.setText(initial)
+            executarBusca()
+        }
+
         btnDoSearch.setOnClickListener { executarBusca() }
 
         etQuery.setOnEditorActionListener { _, actionId, _ ->
