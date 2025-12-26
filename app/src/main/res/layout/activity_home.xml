@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- CABEÇALHO COM BARRA DE BUSCA (igual já está) -->
+        <!-- CABEÇALHO COM BARRA DE BUSCA -->
         <LinearLayout
             android:id="@+id/headerLayout"
             android:layout_width="match_parent"
@@ -35,11 +35,13 @@
                 android:shadowRadius="4"
                 android:layout_marginEnd="8dp" />
 
+            <!-- BARRA DE BUSCA MAIS CURTA -->
             <EditText
                 android:id="@+id/etSearch"
                 android:layout_width="0dp"
                 android:layout_height="36dp"
-                android:layout_weight="1"
+                android:layout_weight="0.7"
+                android:layout_marginEnd="12dp"
                 android:background="@drawable/bg_search_rounded"
                 android:paddingStart="36dp"
                 android:paddingEnd="8dp"
@@ -56,7 +58,6 @@
                 android:id="@+id/btnSettings"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
-                android:layout_marginStart="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_settings"
                 app:tint="#FFFFFF"
