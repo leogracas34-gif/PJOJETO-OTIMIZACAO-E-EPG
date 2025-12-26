@@ -62,12 +62,8 @@ class SearchActivity : AppCompatActivity() {
         }
     }
 
-    // Normaliza texto para melhorar a busca (remove espaços extras, ignora maiúsculas)
     private fun normalizar(text: String?): String {
-        return text
-            ?.trim()
-            ?.lowercase()
-            ?: ""
+        return text?.trim()?.lowercase() ?: ""
     }
 
     private fun executarBusca() {
@@ -91,11 +87,14 @@ class SearchActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         val filmes = response.body()!!
                         resultados += filmes
-                            .filter { normalizar(it.name).contains(qNorm) }
+                            .filter { vod ->
+                                val nomeBusca = normalizar(vod.title ?: vod.name)
+                                nomeBusca.contains(qNorm)
+                            }
                             .map { vod ->
                                 SearchResultItem(
                                     id = vod.id,
-                                    title = vod.name,
+                                    title = vod.title ?: vod.name,
                                     type = "movie",
                                     extraInfo = vod.rating
                                 )
@@ -112,7 +111,9 @@ class SearchActivity : AppCompatActivity() {
                                 if (response.isSuccessful && response.body() != null) {
                                     val series = response.body()!!
                                     resultados += series
-                                        .filter { normalizar(it.name).contains(qNorm) }
+                                        .filter { s ->
+                                            normalizar(s.name).contains(qNorm)
+                                        }
                                         .map { s ->
                                             SearchResultItem(
                                                 id = s.id,
@@ -131,7 +132,6 @@ class SearchActivity : AppCompatActivity() {
                                 call: retrofit2.Call<List<SeriesStream>>,
                                 t: Throwable
                             ) {
-                                // mesmo se der erro nas séries, tenta canais
                                 buscarCanais(username, password, qNorm, resultados)
                             }
                         })
@@ -151,7 +151,9 @@ class SearchActivity : AppCompatActivity() {
                                 if (response.isSuccessful && response.body() != null) {
                                     val series = response.body()!!
                                     resultados += series
-                                        .filter { normalizar(it.name).contains(qNorm) }
+                                        .filter { s ->
+                                            normalizar(s.name).contains(qNorm)
+                                        }
                                         .map { s ->
                                             SearchResultItem(
                                                 id = s.id,
@@ -175,7 +177,6 @@ class SearchActivity : AppCompatActivity() {
             })
     }
 
-    // Busca live streams em uma chamada "global" e filtra
     private fun buscarCanais(
         username: String,
         password: String,
@@ -191,7 +192,9 @@ class SearchActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         val canais = response.body()!!
                         resultados += canais
-                            .filter { normalizar(it.name).contains(qNorm) }
+                            .filter { c ->
+                                normalizar(c.name).contains(qNorm)
+                            }
                             .map { c ->
                                 SearchResultItem(
                                     id = c.id,
