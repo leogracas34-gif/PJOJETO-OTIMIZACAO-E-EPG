@@ -24,25 +24,22 @@ class SettingsActivity : AppCompatActivity() {
         val etPin: EditText = findViewById(R.id.etPin)
         val btnSavePin: Button = findViewById(R.id.btnSavePin)
 
+        // se existirem no layout premium:
         val tvVersion: TextView? = findViewById(R.id.tvVersion)
         val cardClearCache: LinearLayout? = findViewById(R.id.cardClearCache)
         val cardAbout: LinearLayout? = findViewById(R.id.cardAbout)
         val cardLogout: LinearLayout? = findViewById(R.id.cardLogout)
 
-        // -------- VERSÃO DO APP --------
+        // -------- VERSÃO DO APP (FIXA) --------
         tvVersion?.text = "Versão 1.0.0"
 
-        // -------- CONTROLE PARENTAL --------
+        // -------- CONTROLE PARENTAL (CÓDIGO ANTIGO) --------
+        // carregar estado atual
         switchParental.isChecked = ParentalControlManager.isEnabled(this)
         etPin.setText(ParentalControlManager.getPin(this))
 
         switchParental.setOnCheckedChangeListener { _, isChecked ->
             ParentalControlManager.setEnabled(this, isChecked)
-            Toast.makeText(
-                this,
-                if (isChecked) "Controle parental ativado" else "Controle parental desativado",
-                Toast.LENGTH_SHORT
-            ).show()
         }
 
         btnSavePin.setOnClickListener {
@@ -55,24 +52,18 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        // -------- LIMPAR CACHE --------
+        // -------- LIMPAR CACHE (SE O CARD EXISTIR NO LAYOUT) --------
         cardClearCache?.setOnClickListener {
             Thread {
                 Glide.get(this).clearDiskCache()
             }.start()
             Glide.get(this).clearMemory()
-
-            cacheDir.deleteRecursively()
-            externalCacheDir?.deleteRecursively()
-
-            Toast.makeText(this, "Cache limpo com sucesso.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Cache limpo", Toast.LENGTH_SHORT).show()
         }
 
-        // -------- SOBRE O APLICATIVO --------
+        // -------- SOBRE O APLICATIVO (OPCIONAL) --------
         cardAbout?.setOnClickListener {
-            val msg = "VLTV PLAY
-Versão 1.0.0
-Desenvolvido por VLTV."
+            val msg = "VLTV PLAY\nVersão 1.0.0\nDesenvolvido por VLTV."
             AlertDialog.Builder(this)
                 .setTitle("Sobre o aplicativo")
                 .setMessage(msg)
@@ -80,7 +71,7 @@ Desenvolvido por VLTV."
                 .show()
         }
 
-        // -------- SAIR DA CONTA --------
+        // -------- SAIR DA CONTA (OPCIONAL) --------
         cardLogout?.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Sair")
