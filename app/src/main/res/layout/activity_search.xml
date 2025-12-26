@@ -55,7 +55,7 @@
         android:gravity="center"
         android:visibility="gone" />
 
-    <!-- Lista de resultados -->
+    <!-- Grade de resultados -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvResults"
         android:layout_width="match_parent"
