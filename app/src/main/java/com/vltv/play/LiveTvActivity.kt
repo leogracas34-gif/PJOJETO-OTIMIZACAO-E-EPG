@@ -49,6 +49,17 @@ class LiveTvActivity : AppCompatActivity() {
         carregarCategorias()
     }
 
+    // -------- Função helper para detectar adulto --------
+    private fun isAdultName(name: String?): Boolean {
+        if (name.isNullOrBlank()) return false
+        val n = name.lowercase()
+        return n.contains("+18") ||
+                n.contains("adult") ||
+                n.contains("xxx") ||
+                n.contains("hot") ||
+                n.contains("sexo")
+    }
+
     private fun carregarCategorias() {
         progressBar.visibility = View.VISIBLE
 
@@ -60,13 +71,30 @@ class LiveTvActivity : AppCompatActivity() {
                 ) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
-                        val categorias = response.body()!!
+                        var categorias = response.body()!!
+
+                        // Se o controle parental estiver ATIVO, remove categorias adultas
+                        if (ParentalControlManager.isEnabled(this@LiveTvActivity)) {
+                            categorias = categorias.filterNot { cat ->
+                                isAdultName(cat.name)
+                            }
+                        }
+
+                        if (categorias.isEmpty()) {
+                            Toast.makeText(
+                                this@LiveTvActivity,
+                                "Nenhuma categoria disponível.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            rvCategories.adapter = CategoryAdapter(emptyList()) {}
+                            rvChannels.adapter = ChannelAdapter(emptyList(), username, password) {}
+                            return
+                        }
+
                         rvCategories.adapter = CategoryAdapter(categorias) { categoria ->
                             carregarCanais(categoria)
                         }
-                        if (categorias.isNotEmpty()) {
-                            carregarCanais(categorias[0])
-                        }
+                        carregarCanais(categorias[0])
                     } else {
                         Toast.makeText(
                             this@LiveTvActivity,
@@ -99,7 +127,15 @@ class LiveTvActivity : AppCompatActivity() {
                 ) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
-                        val canais = response.body()!!
+                        var canais = response.body()!!
+
+                        // Se controle parental ligado, esconde canais adultos
+                        if (ParentalControlManager.isEnabled(this@LiveTvActivity)) {
+                            canais = canais.filterNot { canal ->
+                                isAdultName(canal.name)
+                            }
+                        }
+
                         rvChannels.adapter = ChannelAdapter(canais, username, password) { canal ->
                             val intent = Intent(this@LiveTvActivity, PlayerActivity::class.java)
                             intent.putExtra("stream_id", canal.id)
@@ -201,10 +237,9 @@ class LiveTvActivity : AppCompatActivity() {
 
             holder.tvName.text = item.name
 
-            // Logo com visual mais premium (usa o item_channel.xml que você mandou)
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .placeholder(R.drawable.bg_logo_placeholder) // crie um shape/gradient bonito
+                .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
                 .into(holder.imgLogo)
 
