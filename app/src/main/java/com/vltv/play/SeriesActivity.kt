@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -28,6 +29,14 @@ class SeriesActivity : AppCompatActivity() {
     private var username = ""
     private var password = ""
 
+    // Cache em memória
+    private var cachedCategories: List<LiveCategory>? = null
+    private val seriesCache = mutableMapOf<String, List<SeriesStream>>() // key = categoryId
+    private var favSeriesCache: List<SeriesStream>? = null
+
+    private var categoryAdapter: SeriesCategoryAdapter? = null
+    private var seriesAdapter: SeriesAdapter? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_tv)
@@ -41,8 +50,11 @@ class SeriesActivity : AppCompatActivity() {
         username = prefs.getString("username", "") ?: ""
         password = prefs.getString("password", "") ?: ""
 
-        rvCategories.layoutManager = LinearLayoutManager(this)
+        rvCategories.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
+        rvCategories.setHasFixedSize(true)
+
         rvSeries.layoutManager = GridLayoutManager(this, 5)
+        rvSeries.setHasFixedSize(true)
 
         carregarCategorias()
     }
@@ -59,6 +71,11 @@ class SeriesActivity : AppCompatActivity() {
     }
 
     private fun carregarCategorias() {
+        cachedCategories?.let { categoriasCacheadas ->
+            aplicarCategorias(categoriasCacheadas)
+            return
+        }
+
         progressBar.visibility = View.VISIBLE
 
         XtreamApi.service.getSeriesCategories(username, password)
@@ -80,6 +97,8 @@ class SeriesActivity : AppCompatActivity() {
                         )
                         categorias.addAll(originais)
 
+                        cachedCategories = categorias
+
                         // se controle parental ligado, remove categorias adultas
                         if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
                             categorias = categorias.filterNot { cat ->
@@ -87,23 +106,7 @@ class SeriesActivity : AppCompatActivity() {
                             }.toMutableList()
                         }
 
-                        rvCategories.adapter = SeriesCategoryAdapter(categorias) { categoria ->
-                            if (categoria.id == "FAV_SERIES") {
-                                carregarSeriesFavoritas()
-                            } else {
-                                carregarSeries(categoria)
-                            }
-                        }
-
-                        val primeiraCategoriaNormal =
-                            categorias.firstOrNull { it.id != "FAV_SERIES" }
-
-                        if (primeiraCategoriaNormal != null) {
-                            carregarSeries(primeiraCategoriaNormal)
-                        } else {
-                            tvCategoryTitle.text = "FAVORITOS"
-                            carregarSeriesFavoritas()
-                        }
+                        aplicarCategorias(categorias)
                     } else {
                         Toast.makeText(
                             this@SeriesActivity,
@@ -124,8 +127,51 @@ class SeriesActivity : AppCompatActivity() {
             })
     }
 
+    private fun aplicarCategorias(categorias: List<LiveCategory>) {
+        if (categorias.isEmpty()) {
+            Toast.makeText(this, "Nenhuma categoria disponível.", Toast.LENGTH_SHORT).show()
+            rvCategories.adapter = SeriesCategoryAdapter(emptyList()) {}
+            rvSeries.adapter = SeriesAdapter(emptyList()) {}
+            return
+        }
+
+        if (categoryAdapter == null) {
+            categoryAdapter = SeriesCategoryAdapter(categorias) { categoria ->
+                if (categoria.id == "FAV_SERIES") {
+                    carregarSeriesFavoritas()
+                } else {
+                    carregarSeries(categoria)
+                }
+            }
+            rvCategories.adapter = categoryAdapter
+        } else {
+            categoryAdapter = SeriesCategoryAdapter(categorias) { categoria ->
+                if (categoria.id == "FAV_SERIES") {
+                    carregarSeriesFavoritas()
+                } else {
+                    carregarSeries(categoria)
+                }
+            }
+            rvCategories.adapter = categoryAdapter
+        }
+
+        val primeiraCategoriaNormal = categorias.firstOrNull { it.id != "FAV_SERIES" }
+        if (primaCategoriaNormal != null) {
+            carregarSeries(primaCategoriaNormal)
+        } else {
+            tvCategoryTitle.text = "FAVORITOS"
+            carregarSeriesFavoritas()
+        }
+    }
+
     private fun carregarSeries(categoria: LiveCategory) {
         tvCategoryTitle.text = categoria.name
+
+        seriesCache[categoria.id]?.let { seriesCacheadas ->
+            aplicarSeries(seriesCacheadas)
+            return
+        }
+
         progressBar.visibility = View.VISIBLE
 
         XtreamApi.service.getSeries(username, password, categoryId = categoria.id)
@@ -138,15 +184,15 @@ class SeriesActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         var series = response.body()!!
 
+                        seriesCache[categoria.id] = series
+
                         if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
                             series = series.filterNot { s ->
                                 isAdultName(s.name)
                             }
                         }
 
-                        rvSeries.adapter = SeriesAdapter(series) { serie ->
-                            abrirDetalhesSerie(serie)
-                        }
+                        aplicarSeries(series)
                     }
                 }
 
@@ -158,6 +204,12 @@ class SeriesActivity : AppCompatActivity() {
 
     private fun carregarSeriesFavoritas() {
         tvCategoryTitle.text = "FAVORITOS"
+
+        favSeriesCache?.let { cacheadas ->
+            aplicarSeries(cacheadas)
+            return
+        }
+
         progressBar.visibility = View.VISIBLE
 
         val favIds = getFavSeries(this)
@@ -185,9 +237,8 @@ class SeriesActivity : AppCompatActivity() {
                             }
                         }
 
-                        rvSeries.adapter = SeriesAdapter(todas) { serie ->
-                            abrirDetalhesSerie(serie)
-                        }
+                        favSeriesCache = todas
+                        aplicarSeries(todas)
                     }
                 }
 
@@ -195,6 +246,20 @@ class SeriesActivity : AppCompatActivity() {
                     progressBar.visibility = View.GONE
                 }
             })
+    }
+
+    private fun aplicarSeries(series: List<SeriesStream>) {
+        if (seriesAdapter == null) {
+            seriesAdapter = SeriesAdapter(series) { serie ->
+                abrirDetalhesSerie(serie)
+            }
+            rvSeries.adapter = seriesAdapter
+        } else {
+            seriesAdapter = SeriesAdapter(series) { serie ->
+                abrirDetalhesSerie(serie)
+            }
+            rvSeries.adapter = seriesAdapter
+        }
     }
 
     private fun abrirDetalhesSerie(serie: SeriesStream) {
@@ -276,9 +341,12 @@ class SeriesActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            Glide.with(holder.itemView)
+            Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .placeholder(R.mipmap.ic_launcher)
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .placeholder(R.drawable.bg_logo_placeholder)
+                .error(R.drawable.bg_logo_placeholder)
+                .centerCrop()
                 .into(holder.imgPoster)
 
             holder.itemView.setOnClickListener { onClick(item) }
