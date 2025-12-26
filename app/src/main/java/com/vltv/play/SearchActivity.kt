@@ -27,11 +27,10 @@ class SearchActivity : AppCompatActivity() {
         adapter = SearchResultAdapter(emptyList()) { item ->
             when (item.type) {
                 "movie" -> {
-                    // abre a mesma tela usada na grade VOD
                     val i = Intent(this, DetailsActivity::class.java)
-                    i.putExtra("stream_id", item.id)      // id do VOD
-                    i.putExtra("stream_ext", "mp4")       // ajuste se tiver outra extensão
-                    i.putExtra("title", item.title)       // título do filme
+                    i.putExtra("stream_id", item.id)
+                    i.putExtra("stream_ext", "mp4")
+                    i.putExtra("title", item.title)
                     startActivity(i)
                 }
                 "series" -> {
@@ -63,9 +62,18 @@ class SearchActivity : AppCompatActivity() {
         }
     }
 
+    // Normaliza texto para melhorar a busca (remove espaços extras, ignora maiúsculas)
+    private fun normalizar(text: String?): String {
+        return text
+            ?.trim()
+            ?.lowercase()
+            ?: ""
+    }
+
     private fun executarBusca() {
-        val q = etQuery.text.toString().trim()
-        if (q.isEmpty()) return
+        val raw = etQuery.text.toString()
+        val qNorm = normalizar(raw)
+        if (qNorm.isEmpty()) return
 
         val prefs = getSharedPreferences("vltv_prefs", MODE_PRIVATE)
         val username = prefs.getString("username", "") ?: ""
@@ -73,7 +81,7 @@ class SearchActivity : AppCompatActivity() {
 
         val resultados = mutableListOf<SearchResultItem>()
 
-        // 1) Todos os filmes (sem category_id)
+        // 1) FILMES (todos)
         XtreamApi.service.getAllVodStreams(username, password)
             .enqueue(object : retrofit2.Callback<List<VodStream>> {
                 override fun onResponse(
@@ -83,7 +91,7 @@ class SearchActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         val filmes = response.body()!!
                         resultados += filmes
-                            .filter { it.name.contains(q, ignoreCase = true) }
+                            .filter { normalizar(it.name).contains(qNorm) }
                             .map { vod ->
                                 SearchResultItem(
                                     id = vod.id,
@@ -94,7 +102,7 @@ class SearchActivity : AppCompatActivity() {
                             }
                     }
 
-                    // 2) Todas as séries (sem category_id)
+                    // 2) SÉRIES (todas)
                     XtreamApi.service.getAllSeries(username, password)
                         .enqueue(object : retrofit2.Callback<List<SeriesStream>> {
                             override fun onResponse(
@@ -104,7 +112,7 @@ class SearchActivity : AppCompatActivity() {
                                 if (response.isSuccessful && response.body() != null) {
                                     val series = response.body()!!
                                     resultados += series
-                                        .filter { it.name.contains(q, ignoreCase = true) }
+                                        .filter { normalizar(it.name).contains(qNorm) }
                                         .map { s ->
                                             SearchResultItem(
                                                 id = s.id,
@@ -114,14 +122,17 @@ class SearchActivity : AppCompatActivity() {
                                             )
                                         }
                                 }
-                                adapter.updateData(resultados)
+
+                                // 3) Canais ao vivo (todos)
+                                buscarCanais(username, password, qNorm, resultados)
                             }
 
                             override fun onFailure(
                                 call: retrofit2.Call<List<SeriesStream>>,
                                 t: Throwable
                             ) {
-                                adapter.updateData(resultados)
+                                // mesmo se der erro nas séries, tenta canais
+                                buscarCanais(username, password, qNorm, resultados)
                             }
                         })
                 }
@@ -130,7 +141,7 @@ class SearchActivity : AppCompatActivity() {
                     call: retrofit2.Call<List<VodStream>>,
                     t: Throwable
                 ) {
-                    // se filmes falharem, tenta só séries
+                    // se filmes falharem, começa direto por séries
                     XtreamApi.service.getAllSeries(username, password)
                         .enqueue(object : retrofit2.Callback<List<SeriesStream>> {
                             override fun onResponse(
@@ -140,7 +151,7 @@ class SearchActivity : AppCompatActivity() {
                                 if (response.isSuccessful && response.body() != null) {
                                     val series = response.body()!!
                                     resultados += series
-                                        .filter { it.name.contains(q, ignoreCase = true) }
+                                        .filter { normalizar(it.name).contains(qNorm) }
                                         .map { s ->
                                             SearchResultItem(
                                                 id = s.id,
@@ -150,16 +161,54 @@ class SearchActivity : AppCompatActivity() {
                                             )
                                         }
                                 }
-                                adapter.updateData(resultados)
+                                buscarCanais(username, password, qNorm, resultados)
                             }
 
                             override fun onFailure(
                                 call: retrofit2.Call<List<SeriesStream>>,
                                 t: Throwable
                             ) {
-                                adapter.updateData(emptyList())
+                                buscarCanais(username, password, qNorm, resultados)
                             }
                         })
+                }
+            })
+    }
+
+    // Busca live streams em uma chamada "global" e filtra
+    private fun buscarCanais(
+        username: String,
+        password: String,
+        qNorm: String,
+        resultados: MutableList<SearchResultItem>
+    ) {
+        XtreamApi.service.getLiveStreams(username, password, categoryId = "0")
+            .enqueue(object : retrofit2.Callback<List<LiveStream>> {
+                override fun onResponse(
+                    call: retrofit2.Call<List<LiveStream>>,
+                    response: retrofit2.Response<List<LiveStream>>
+                ) {
+                    if (response.isSuccessful && response.body() != null) {
+                        val canais = response.body()!!
+                        resultados += canais
+                            .filter { normalizar(it.name).contains(qNorm) }
+                            .map { c ->
+                                SearchResultItem(
+                                    id = c.id,
+                                    title = c.name,
+                                    type = "live",
+                                    extraInfo = null
+                                )
+                            }
+                    }
+                    adapter.updateData(resultados)
+                }
+
+                override fun onFailure(
+                    call: retrofit2.Call<List<LiveStream>>,
+                    t: Throwable
+                ) {
+                    adapter.updateData(resultados)
                 }
             })
     }
