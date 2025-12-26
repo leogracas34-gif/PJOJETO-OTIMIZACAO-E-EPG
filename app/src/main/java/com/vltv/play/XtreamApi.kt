@@ -48,6 +48,7 @@ data class LiveStream(
 data class VodStream(
     val stream_id: Int,
     val name: String,
+    val title: String?,               // <- título vindo do JSON
     val stream_icon: String?,
     val container_extension: String?,
     val rating: String?
@@ -103,7 +104,6 @@ data class VodInfoData(
 )
 
 // --- EPG (guia de programação) ---
-// wrapper porque o servidor manda { "epg_listings": [ ... ] }
 data class EpgWrapper(
     val epg_listings: List<EpgResponseItem>?
 )
@@ -210,7 +210,7 @@ interface XtreamService {
         @Query("series_id") seriesId: Int
     ): Call<SeriesInfoResponse>
 
-    // --- EPG curto para 1 canal (formato do seu servidor) ---
+    // --- EPG curto por canal ---
     @GET("player_api.php")
     fun getShortEpg(
         @Query("username") user: String,
