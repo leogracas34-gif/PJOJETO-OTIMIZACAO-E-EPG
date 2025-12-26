@@ -9,7 +9,7 @@ import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 class SearchActivity : AppCompatActivity() {
@@ -56,7 +56,8 @@ class SearchActivity : AppCompatActivity() {
             }
         }
 
-        rvResults.layoutManager = LinearLayoutManager(this)
+        // AGORA EM GRID
+        rvResults.layoutManager = GridLayoutManager(this, 5)
         rvResults.adapter = adapter
 
         // Texto vindo da HomeActivity
