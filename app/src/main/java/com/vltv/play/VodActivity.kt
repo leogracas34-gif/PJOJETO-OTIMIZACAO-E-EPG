@@ -51,6 +51,17 @@ class VodActivity : AppCompatActivity() {
         carregarCategorias()
     }
 
+    // -------- helper p/ detectar adulto --------
+    private fun isAdultName(name: String?): Boolean {
+        if (name.isNullOrBlank()) return false
+        val n = name.lowercase()
+        return n.contains("+18") ||
+                n.contains("adult") ||
+                n.contains("xxx") ||
+                n.contains("hot") ||
+                n.contains("sexo")
+    }
+
     private fun carregarCategorias() {
         progressBar.visibility = View.VISIBLE
 
@@ -64,7 +75,7 @@ class VodActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         val originais = response.body()!!
 
-                        val categorias = mutableListOf<LiveCategory>()
+                        var categorias = mutableListOf<LiveCategory>()
                         categorias.add(
                             LiveCategory(
                                 category_id = "FAV",
@@ -72,6 +83,13 @@ class VodActivity : AppCompatActivity() {
                             )
                         )
                         categorias.addAll(originais)
+
+                        // se controle parental ligado, remove categorias adultas
+                        if (ParentalControlManager.isEnabled(this@VodActivity)) {
+                            categorias = categorias.filterNot { cat ->
+                                isAdultName(cat.name)
+                            }.toMutableList()
+                        }
 
                         rvCategories.adapter = VodCategoryAdapter(categorias) { categoria ->
                             if (categoria.id == "FAV") {
@@ -81,8 +99,14 @@ class VodActivity : AppCompatActivity() {
                             }
                         }
 
-                        if (categorias.size > 1) {
-                            carregarFilmes(categorias[1])
+                        val primeiraCategoriaNormal =
+                            categorias.firstOrNull { it.id != "FAV" }
+
+                        if (primeiraCategoriaNormal != null) {
+                            carregarFilmes(primeiraCategoriaNormal)
+                        } else {
+                            tvCategoryTitle.text = "FAVORITOS"
+                            carregarFilmesFavoritos()
                         }
                     } else {
                         Toast.makeText(
@@ -116,8 +140,16 @@ class VodActivity : AppCompatActivity() {
                 ) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
+                        var filmes = response.body()!!
+
+                        if (ParentalControlManager.isEnabled(this@VodActivity)) {
+                            filmes = filmes.filterNot { vod ->
+                                isAdultName(vod.name) || isAdultName(vod.title)
+                            }
+                        }
+
                         rvMovies.adapter = VodAdapter(
-                            response.body()!!,
+                            filmes,
                             onClick = { filme -> abrirDetalhes(filme) },
                             onDownloadClick = { filme -> mostrarMenuDownload(filme) }
                         )
@@ -154,10 +186,17 @@ class VodActivity : AppCompatActivity() {
                 ) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
-                        val todos = response.body()!!
-                        val apenasFav = todos.filter { favIds.contains(it.id) }
+                        var todos = response.body()!!
+                        todos = todos.filter { favIds.contains(it.id) }
+
+                        if (ParentalControlManager.isEnabled(this@VodActivity)) {
+                            todos = todos.filterNot { vod ->
+                                isAdultName(vod.name) || isAdultName(vod.title)
+                            }
+                        }
+
                         rvMovies.adapter = VodAdapter(
-                            apenasFav,
+                            todos,
                             onClick = { filme -> abrirDetalhes(filme) },
                             onDownloadClick = { filme -> mostrarMenuDownload(filme) }
                         )
@@ -188,7 +227,6 @@ class VodActivity : AppCompatActivity() {
     // ================= MENU DOWNLOAD =================
 
     private fun mostrarMenuDownload(filme: VodStream) {
-        // ancora no root da activity; se quiser pode trocar por uma view do card
         val anchor = findViewById<View>(android.R.id.content)
         val popup = PopupMenu(this, anchor)
         menuInflater.inflate(R.menu.menu_download, popup.menu)
@@ -253,7 +291,6 @@ class VodActivity : AppCompatActivity() {
             "Meus downloads (premium) – ${filme.name}",
             Toast.LENGTH_LONG
         ).show()
-        // depois você cria uma Activity/Fragment de downloads premium aqui
     }
 
     // ================= ADAPTERS =================
