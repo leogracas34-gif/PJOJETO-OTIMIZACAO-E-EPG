@@ -38,6 +38,11 @@ class SettingsActivity : AppCompatActivity() {
 
         switchParental.setOnCheckedChangeListener { _, isChecked ->
             ParentalControlManager.setEnabled(this, isChecked)
+            Toast.makeText(
+                this,
+                if (isChecked) "Controle parental ativado" else "Controle parental desativado",
+                Toast.LENGTH_SHORT
+            ).show()
         }
 
         btnSavePin.setOnClickListener {
@@ -65,7 +70,9 @@ class SettingsActivity : AppCompatActivity() {
 
         // -------- SOBRE O APLICATIVO --------
         cardAbout?.setOnClickListener {
-            val msg = "VLTV PLAY\nVersão 1.0.0\nDesenvolvido por VLTV."
+            val msg = "VLTV PLAY
+Versão 1.0.0
+Desenvolvido por VLTV."
             AlertDialog.Builder(this)
                 .setTitle("Sobre o aplicativo")
                 .setMessage(msg)
