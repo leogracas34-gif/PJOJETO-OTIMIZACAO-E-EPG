@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -30,6 +31,13 @@ class LiveTvActivity : AppCompatActivity() {
     private var username = ""
     private var password = ""
 
+    // Cache simples em memória para evitar repetir chamadas
+    private var cachedCategories: List<LiveCategory>? = null
+    private val channelsCache = mutableMapOf<String, List<LiveStream>>() // key = categoryId
+
+    private var categoryAdapter: CategoryAdapter? = null
+    private var channelAdapter: ChannelAdapter? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_tv)
@@ -43,8 +51,11 @@ class LiveTvActivity : AppCompatActivity() {
         username = prefs.getString("username", "") ?: ""
         password = prefs.getString("password", "") ?: ""
 
-        rvCategories.layoutManager = LinearLayoutManager(this)
+        rvCategories.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
+        rvCategories.setHasFixedSize(true)
+
         rvChannels.layoutManager = GridLayoutManager(this, 5)
+        rvChannels.setHasFixedSize(true)
 
         carregarCategorias()
     }
@@ -61,6 +72,12 @@ class LiveTvActivity : AppCompatActivity() {
     }
 
     private fun carregarCategorias() {
+        // Se já temos cache em memória, usa direto (muito mais rápido ao voltar para a tela)
+        cachedCategories?.let { categorias ->
+            aplicarCategorias(categorias)
+            return
+        }
+
         progressBar.visibility = View.VISIBLE
 
         XtreamApi.service.getLiveCategories(username, password)
@@ -73,6 +90,9 @@ class LiveTvActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         var categorias = response.body()!!
 
+                        // Cache em memória
+                        cachedCategories = categorias
+
                         // Se o controle parental estiver ATIVO, remove categorias adultas
                         if (ParentalControlManager.isEnabled(this@LiveTvActivity)) {
                             categorias = categorias.filterNot { cat ->
@@ -80,21 +100,7 @@ class LiveTvActivity : AppCompatActivity() {
                             }
                         }
 
-                        if (categorias.isEmpty()) {
-                            Toast.makeText(
-                                this@LiveTvActivity,
-                                "Nenhuma categoria disponível.",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            rvCategories.adapter = CategoryAdapter(emptyList()) {}
-                            rvChannels.adapter = ChannelAdapter(emptyList(), username, password) {}
-                            return
-                        }
-
-                        rvCategories.adapter = CategoryAdapter(categorias) { categoria ->
-                            carregarCanais(categoria)
-                        }
-                        carregarCanais(categorias[0])
+                        aplicarCategorias(categorias)
                     } else {
                         Toast.makeText(
                             this@LiveTvActivity,
@@ -115,8 +121,43 @@ class LiveTvActivity : AppCompatActivity() {
             })
     }
 
+    private fun aplicarCategorias(categorias: List<LiveCategory>) {
+        if (categorias.isEmpty()) {
+            Toast.makeText(
+                this@LiveTvActivity,
+                "Nenhuma categoria disponível.",
+                Toast.LENGTH_SHORT
+            ).show()
+            rvCategories.adapter = CategoryAdapter(emptyList()) {}
+            rvChannels.adapter = ChannelAdapter(emptyList(), username, password) {}
+            return
+        }
+
+        if (categoryAdapter == null) {
+            categoryAdapter = CategoryAdapter(categorias) { categoria ->
+                carregarCanais(categoria)
+            }
+            rvCategories.adapter = categoryAdapter
+        } else {
+            categoryAdapter = CategoryAdapter(categorias) { categoria ->
+                carregarCanais(categoria)
+            }
+            rvCategories.adapter = categoryAdapter
+        }
+
+        // Carrega a primeira categoria apenas uma vez
+        carregarCanais(categorias[0])
+    }
+
     private fun carregarCanais(categoria: LiveCategory) {
         tvCategoryTitle.text = categoria.name
+
+        // Se já buscamos essa categoria antes, usa cache
+        channelsCache[categoria.id]?.let { canaisCacheados ->
+            aplicarCanais(categoria, canaisCacheados)
+            return
+        }
+
         progressBar.visibility = View.VISIBLE
 
         XtreamApi.service.getLiveStreams(username, password, categoryId = categoria.id)
@@ -129,6 +170,9 @@ class LiveTvActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         var canais = response.body()!!
 
+                        // Cache por categoria
+                        channelsCache[categoria.id] = canais
+
                         // Se controle parental ligado, esconde canais adultos
                         if (ParentalControlManager.isEnabled(this@LiveTvActivity)) {
                             canais = canais.filterNot { canal ->
@@ -136,14 +180,7 @@ class LiveTvActivity : AppCompatActivity() {
                             }
                         }
 
-                        rvChannels.adapter = ChannelAdapter(canais, username, password) { canal ->
-                            val intent = Intent(this@LiveTvActivity, PlayerActivity::class.java)
-                            intent.putExtra("stream_id", canal.id)
-                            intent.putExtra("stream_ext", "ts")
-                            intent.putExtra("stream_type", "live")
-                            intent.putExtra("channel_name", canal.name)
-                            startActivity(intent)
-                        }
+                        aplicarCanais(categoria, canais)
                     } else {
                         Toast.makeText(
                             this@LiveTvActivity,
@@ -162,6 +199,32 @@ class LiveTvActivity : AppCompatActivity() {
                     ).show()
                 }
             })
+    }
+
+    private fun aplicarCanais(categoria: LiveCategory, canais: List<LiveStream>) {
+        tvCategoryTitle.text = categoria.name
+
+        if (channelAdapter == null) {
+            channelAdapter = ChannelAdapter(canais, username, password) { canal ->
+                val intent = Intent(this@LiveTvActivity, PlayerActivity::class.java)
+                intent.putExtra("stream_id", canal.id)
+                intent.putExtra("stream_ext", "ts")
+                intent.putExtra("stream_type", "live")
+                intent.putExtra("channel_name", canal.name)
+                startActivity(intent)
+            }
+            rvChannels.adapter = channelAdapter
+        } else {
+            channelAdapter = ChannelAdapter(canais, username, password) { canal ->
+                val intent = Intent(this@LiveTvActivity, PlayerActivity::class.java)
+                intent.putExtra("stream_id", canal.id)
+                intent.putExtra("stream_ext", "ts")
+                intent.putExtra("stream_type", "live")
+                intent.putExtra("channel_name", canal.name)
+                startActivity(intent)
+            }
+            rvChannels.adapter = channelAdapter
+        }
     }
 
     // --------------------
@@ -239,8 +302,10 @@ class LiveTvActivity : AppCompatActivity() {
 
             Glide.with(holder.itemView.context)
                 .load(item.icon)
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
+                .centerCrop()
                 .into(holder.imgLogo)
 
             carregarEpg(holder, item)
