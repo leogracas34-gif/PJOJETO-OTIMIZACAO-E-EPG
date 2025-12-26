@@ -52,13 +52,11 @@ class SettingsActivity : AppCompatActivity() {
 
         // -------- LIMPAR CACHE --------
         cardClearCache?.setOnClickListener {
-            // Limpa cache de imagens do Glide (disco precisa ser em thread separada)
             Thread {
                 Glide.get(this).clearDiskCache()
             }.start()
             Glide.get(this).clearMemory()
 
-            // Limpa cache do próprio app (arquivos temporários)
             cacheDir.deleteRecursively()
             externalCacheDir?.deleteRecursively()
 
