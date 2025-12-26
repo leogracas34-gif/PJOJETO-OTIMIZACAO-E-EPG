@@ -38,11 +38,6 @@ class SettingsActivity : AppCompatActivity() {
 
         switchParental.setOnCheckedChangeListener { _, isChecked ->
             ParentalControlManager.setEnabled(this, isChecked)
-            Toast.makeText(
-                this,
-                if (isChecked) "Controle parental ativado" else "Controle parental desativado",
-                Toast.LENGTH_SHORT
-            ).show()
         }
 
         btnSavePin.setOnClickListener {
