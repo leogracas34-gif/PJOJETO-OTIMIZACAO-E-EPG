@@ -10,7 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.vltv.play.databinding.ActivityHomeBinding
-import com.vltv.play.DownloadHelper  // ✅ ADICIONADO IMPORT
+import com.vltv.play.DownloadHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,13 +29,12 @@ class HomeActivity : AppCompatActivity() {
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Receiver de downloads ✅ JÁ ESTÁ CERTO
+        // Receiver de downloads
         DownloadHelper.registerReceiver(this)
 
         setupClicks()
     }
 
-    // resto do código continua EXATAMENTE IGUAL...
     override fun onResume() {
         super.onResume()
         carregarBannerAleatorio()
@@ -57,13 +56,13 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this, SeriesActivity::class.java))
         }
 
-        // Campo de busca no cabeçalho
+        // Campo de busca no cabeçalho -> abre tela de busca global
         binding.etSearch.setOnEditorActionListener { v, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 val texto = v.text.toString().trim()
                 if (texto.isNotEmpty()) {
-                    val intent = Intent(this, VodActivity::class.java)
-                    intent.putExtra("search_query", texto)
+                    val intent = Intent(this, SearchActivity::class.java)
+                    intent.putExtra("initial_query", texto)
                     startActivity(intent)
                 }
                 true
@@ -106,7 +105,8 @@ class HomeActivity : AppCompatActivity() {
                 prefs.edit().clear().apply()
 
                 val intent = Intent(this, LoginActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                intent.flags =
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
                 finish()
             }
