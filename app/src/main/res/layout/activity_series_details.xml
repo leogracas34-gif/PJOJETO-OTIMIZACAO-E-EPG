@@ -196,26 +196,26 @@
 
                 <ImageButton
                     android:id="@+id/btnSeriesDislike"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
                     android:layout_marginEnd="12dp"
                     android:background="@android:color/transparent"
-                    android:src="@drawable/ic_dislike_outline" />
+                    android:src="@drawable/ic_thumb_down" />
 
                 <ImageButton
                     android:id="@+id/btnSeriesLike"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
                     android:layout_marginEnd="12dp"
                     android:background="@android:color/transparent"
-                    android:src="@drawable/ic_like_outline" />
+                    android:src="@drawable/ic_thumb_up" />
 
                 <ImageButton
                     android:id="@+id/btnSeriesLove"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
                     android:background="@android:color/transparent"
-                    android:src="@drawable/ic_love_outline" />
+                    android:src="@drawable/ic_favorite" />
             </LinearLayout>
         </LinearLayout>
 
