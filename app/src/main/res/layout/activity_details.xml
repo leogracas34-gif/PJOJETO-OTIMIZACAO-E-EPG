@@ -142,12 +142,63 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- JOINHAS FILME -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp">
+
+            <!-- Label do rating -->
+            <TextView
+                android:id="@+id/tvLikeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                android:text="Gostei" />
+
+            <!-- Botões das joinhas -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/btnDislike"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_dislike_outline" />
+
+                <ImageButton
+                    android:id="@+id/btnLike"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_like_outline" />
+
+                <ImageButton
+                    android:id="@+id/btnLove"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_love_outline" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- Continuar assistindo -->
         <Button
             android:id="@+id/btnResume"
             android:layout_width="match_parent"
             android:layout_height="50dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="16dp"
             android:backgroundTint="#555555"
             android:text="CONTINUAR ASSISTINDO"
             android:textColor="#FFFFFF"
