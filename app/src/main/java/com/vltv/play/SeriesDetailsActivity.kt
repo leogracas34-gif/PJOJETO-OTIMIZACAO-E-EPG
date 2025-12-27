@@ -41,6 +41,14 @@ class SeriesDetailsActivity : AppCompatActivity() {
 
     private lateinit var btnDownloadSeason: Button
 
+    // --- JOINHAS SÉRIE ---
+    private lateinit var tvLikeLabelSeries: TextView
+    private lateinit var btnSeriesDislike: ImageButton
+    private lateinit var btnSeriesLike: ImageButton
+    private lateinit var btnSeriesLove: ImageButton
+    // -1 = não é para mim, 0 = neutro, 1 = gostei, 2 = amei
+    private var currentRatingSeries: Int = 0
+
     private var episodesBySeason: Map<String, List<EpisodeStream>> = emptyMap()
     private var sortedSeasons: List<String> = emptyList()
     private var currentSeason: String = ""
@@ -74,6 +82,12 @@ class SeriesDetailsActivity : AppCompatActivity() {
         tvDownloadEpisodeState = findViewById(R.id.tvDownloadSeriesState)
 
         btnDownloadSeason = findViewById(R.id.btnDownloadSeason)
+
+        // JOINHAS
+        tvLikeLabelSeries = findViewById(R.id.tvLikeLabelSeries)
+        btnSeriesDislike = findViewById(R.id.btnSeriesDislike)
+        btnSeriesLike = findViewById(R.id.btnSeriesLike)
+        btnSeriesLove = findViewById(R.id.btnSeriesLove)
 
         if (isTelevisionDevice()) {
             btnDownloadEpisodeArea.visibility = View.GONE
@@ -213,6 +227,14 @@ class SeriesDetailsActivity : AppCompatActivity() {
                 .show()
         }
 
+        // JOINHAS: carregar estado salvo e listeners
+        currentRatingSeries = getSeriesRating()
+        atualizarUiSeriesRating()
+
+        btnSeriesDislike.setOnClickListener { onSeriesRatingClicked(-1) }
+        btnSeriesLike.setOnClickListener { onSeriesRatingClicked(1) }
+        btnSeriesLove.setOnClickListener { onSeriesRatingClicked(2) }
+
         carregarSeriesInfo()
     }
 
@@ -237,6 +259,47 @@ class SeriesDetailsActivity : AppCompatActivity() {
     private fun atualizarIconeFavoritoSerie(isFav: Boolean) {
         val res = if (isFav) R.drawable.ic_star_filled else R.drawable.ic_star_border
         btnFavoriteSeries.setImageResource(res)
+    }
+
+    // -------- JOINHAS SÉRIE (local) --------
+
+    private fun seriesRatingKey(): String = "rating_series_$seriesId"
+
+    private fun getSeriesRating(): Int {
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        return prefs.getInt(seriesRatingKey(), 0)
+    }
+
+    private fun saveSeriesRating(value: Int) {
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putInt(seriesRatingKey(), value).apply()
+    }
+
+    private fun onSeriesRatingClicked(newValue: Int) {
+        currentRatingSeries = if (currentRatingSeries == newValue) 0 else newValue
+        saveSeriesRating(currentRatingSeries)
+        atualizarUiSeriesRating()
+    }
+
+    private fun atualizarUiSeriesRating() {
+        btnSeriesDislike.setImageResource(
+            if (currentRatingSeries == -1) R.drawable.ic_dislike_filled else R.drawable.ic_dislike_outline
+        )
+        btnSeriesLike.setImageResource(
+            if (currentRatingSeries == 1) R.drawable.ic_like_filled else R.drawable.ic_like_outline
+        )
+        btnSeriesLove.setImageResource(
+            if (currentRatingSeries == 2) R.drawable.ic_love_filled else R.drawable.ic_love_outline
+        )
+
+        tvLikeLabelSeries.visibility =
+            if (currentRatingSeries == 0) View.GONE else View.VISIBLE
+        tvLikeLabelSeries.text = when (currentRatingSeries) {
+            -1 -> "Não é para mim"
+            1 -> "Gostei"
+            2 -> "Amei!"
+            else -> ""
+        }
     }
 
     private fun carregarSeriesInfo() {
