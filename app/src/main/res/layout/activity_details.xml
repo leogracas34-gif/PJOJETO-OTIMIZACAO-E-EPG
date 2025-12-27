@@ -147,7 +147,7 @@
             android:id="@+id/btnResume"
             android:layout_width="match_parent"
             android:layout_height="50dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:backgroundTint="#555555"
             android:text="CONTINUAR ASSISTINDO"
             android:textColor="#FFFFFF"
