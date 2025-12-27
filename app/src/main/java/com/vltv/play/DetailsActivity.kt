@@ -2,6 +2,7 @@ package com.vltv.play
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.*
@@ -14,31 +15,25 @@ import retrofit2.Response
 
 class DetailsActivity : AppCompatActivity() {
 
-    private lateinit var tvPlot: TextView
-    private lateinit var tvGenre: TextView
-    private lateinit var tvCast: TextView
-    private lateinit var tvDirector: TextView
-    private lateinit var tvRating: TextView
+    private var streamId: Int = 0
+    private var name: String = ""
+    private var icon: String? = null
+    private var rating: String = "0.0"
+
     private lateinit var imgPoster: ImageView
+    private lateinit var tvTitle: TextView
+    private lateinit var tvRating: TextView
+    private lateinit var tvGenre: TextView
+    private lateinit var tvDirector: TextView
+    private lateinit var tvCast: TextView
+    private lateinit var tvPlot: TextView
     private lateinit var btnPlay: Button
-    private lateinit var btnFavorite: ImageButton
     private lateinit var btnResume: Button
+    private lateinit var btnFavorite: ImageButton
 
     private lateinit var btnDownloadArea: LinearLayout
     private lateinit var imgDownloadState: ImageView
     private lateinit var tvDownloadState: TextView
-
-    // --- JOINHAS ---
-    private lateinit var tvLikeLabel: TextView
-    private lateinit var btnDislike: ImageButton
-    private lateinit var btnLike: ImageButton
-    private lateinit var btnLove: ImageButton
-    // -1 = não é para mim, 0 = neutro, 1 = gostei, 2 = amei
-    private var currentRating: Int = 0
-
-    private var streamId: Int = 0
-    private var extension: String = "mp4"
-    private var movieTitle: String = "Sem Título"
 
     private enum class DownloadState { BAIXAR, BAIXANDO, BAIXADO }
     private var downloadState: DownloadState = DownloadState.BAIXAR
@@ -47,37 +42,36 @@ class DetailsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_details)
 
-        movieTitle = intent.getStringExtra("title") ?: "Sem Título"
-        val icon = intent.getStringExtra("icon")
         streamId = intent.getIntExtra("stream_id", 0)
-        extension = intent.getStringExtra("extension") ?: "mp4"
+        name = intent.getStringExtra("name") ?: ""
+        icon = intent.getStringExtra("icon")
+        rating = intent.getStringExtra("rating") ?: "0.0"
 
-        tvPlot = findViewById(R.id.tvPlot)
-        val tvTitle = findViewById<TextView>(R.id.tvTitle)
-        tvGenre = findViewById(R.id.tvGenre)
-        tvCast = findViewById(R.id.tvCast)
-        tvDirector = findViewById(R.id.tvDirector)
-        tvRating = findViewById(R.id.tvRating)
         imgPoster = findViewById(R.id.imgPoster)
+        tvTitle = findViewById(R.id.tvTitle)
+        tvRating = findViewById(R.id.tvRating)
+        tvGenre = findViewById(R.id.tvGenre)
+        tvDirector = findViewById(R.id.tvDirector)
+        tvCast = findViewById(R.id.tvCast)
+        tvPlot = findViewById(R.id.tvPlot)
         btnPlay = findViewById(R.id.btnPlay)
-        btnFavorite = findViewById(R.id.btnFavorite)
         btnResume = findViewById(R.id.btnResume)
+        btnFavorite = findViewById(R.id.btnFavorite)
 
         btnDownloadArea = findViewById(R.id.btnDownloadArea)
         imgDownloadState = findViewById(R.id.imgDownloadState)
         tvDownloadState = findViewById(R.id.tvDownloadState)
 
-        // --- views dos joinhas ---
-        tvLikeLabel = findViewById(R.id.tvLikeLabel)
-        btnDislike = findViewById(R.id.btnDislike)
-        btnLike = findViewById(R.id.btnLike)
-        btnLove = findViewById(R.id.btnLove)
-
         if (isTelevisionDevice()) {
             btnDownloadArea.visibility = View.GONE
         }
 
-        tvTitle.text = movieTitle
+        tvTitle.text = name
+        tvRating.text = "Nota: $rating"
+        tvGenre.text = "Gênero: ..."
+        tvDirector.text = "Diretor: Informação não disponível"
+        tvCast.text = "Elenco: Informação não disponível"
+        tvPlot.text = "..."
 
         Glide.with(this)
             .load(icon)
@@ -101,177 +95,36 @@ class DetailsActivity : AppCompatActivity() {
             atualizarIconeFavorito(novoFav)
         }
 
-        configurarBotaoResume()
-
         btnPlay.setOnClickListener {
-            abrirPlayer(movieTitle, startPositionMs = 0L)
+            abrirPlayer(false)
         }
-        btnPlay.requestFocus()
 
         btnResume.setOnClickListener {
-            val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-            val keyBase = "movie_resume_$streamId"
-            val pos = prefs.getLong("${keyBase}_pos", 0L)
-            abrirPlayer(movieTitle, startPositionMs = pos)
+            abrirPlayer(true)
         }
 
         restaurarEstadoDownload()
 
         btnDownloadArea.setOnClickListener {
             when (downloadState) {
-                DownloadState.BAIXAR -> {
-                    val url = montarUrlFilme()
-
-                    val safeTitle = movieTitle
-                        .replace("[^a-zA-Z0-9 _.-]".toRegex(), "_")
-                        .ifBlank { "movie" }
-                    val fileName = "${safeTitle}_$streamId.$extension"
-
-                    DownloadHelper.enqueueDownload(
-                        this,
-                        url,
-                        fileName,
-                        logicalId = "movie_$streamId",
-                        type = "movie"
-                    )
-
-                    Toast.makeText(this, "Download iniciado", Toast.LENGTH_SHORT).show()
-                    setDownloadState(DownloadState.BAIXANDO)
-                }
-
-                DownloadState.BAIXANDO -> {
-                    val popup = PopupMenu(this, btnDownloadArea)
-                    popup.menu.add("Ir para Meus downloads")
-
-                    popup.setOnMenuItemClickListener { item ->
-                        when (item.title) {
-                            "Ir para Meus downloads" -> {
-                                startActivity(Intent(this, DownloadsActivity::class.java))
-                                true
-                            }
-
-                            else -> false
-                        }
-                    }
-                    popup.show()
-                }
-
+                DownloadState.BAIXAR -> iniciarDownload()
+                DownloadState.BAIXANDO -> mostrarMenuBaixando()
                 DownloadState.BAIXADO -> {
-                    Toast.makeText(this, "Arquivo já baixado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Filme já baixado.", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this, DownloadsActivity::class.java))
                 }
             }
         }
 
-        // --- JOINHAS: carregar estado salvo e configurar cliques ---
-        currentRating = getMovieRating()
-        atualizarUiRating()
-
-        btnDislike.setOnClickListener { onRatingClicked(-1) }
-        btnLike.setOnClickListener { onRatingClicked(1) }
-        btnLove.setOnClickListener { onRatingClicked(2) }
-
-        // Detalhes do painel Xtream
-        carregarDetalhes(streamId)
-        // Complemento do TMDB
-        carregarDetalhesTmdb(movieTitle)
+        carregarMovieInfo()
+        verificarResume()
     }
 
     override fun onResume() {
         super.onResume()
         restaurarEstadoDownload()
+        verificarResume()
     }
-
-    // -------- URL filme --------
-
-    private fun montarUrlFilme(): String {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val user = prefs.getString("username", "") ?: ""
-        val pass = prefs.getString("password", "") ?: ""
-
-        val serverList = listOf(
-            "http://tvblack.shop",
-            "http://firewallnaousardns.xyz:80",
-            "http://fibercdn.sbs"
-        )
-        val server = serverList.first()
-
-        return montarUrlStream(
-            server = server,
-            streamType = "movie",
-            user = user,
-            pass = pass,
-            id = streamId,
-            ext = extension
-        )
-    }
-
-    private fun abrirPlayer(name: String, startPositionMs: Long) {
-        val intent = Intent(this, PlayerActivity::class.java)
-        intent.putExtra("stream_id", streamId)
-        intent.putExtra("stream_ext", extension)
-        intent.putExtra("stream_type", "movie")
-        intent.putExtra("channel_name", name)
-        if (startPositionMs > 0L) {
-            intent.putExtra("start_position_ms", startPositionMs)
-        }
-        startActivity(intent)
-    }
-
-    // -------- RESUME --------
-
-    private fun configurarBotaoResume() {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val keyBase = "movie_resume_$streamId"
-        val pos = prefs.getLong("${keyBase}_pos", 0L)
-        val dur = prefs.getLong("${keyBase}_dur", 0L)
-        val existe = pos > 30_000L && dur > 0L && pos < (dur * 0.95).toLong()
-        btnResume.visibility = if (existe) Button.VISIBLE else Button.GONE
-    }
-
-    // -------- DOWNLOAD --------
-
-    private fun getProgressText(): String {
-        val progress = DownloadHelper.getDownloadProgress(this, "movie_$streamId")
-        return when (downloadState) {
-            DownloadState.BAIXAR -> "Baixar"
-            DownloadState.BAIXANDO -> "Baixando ${progress}%"
-            DownloadState.BAIXADO -> "Baixado 100%"
-        }
-    }
-
-    private fun setDownloadState(state: DownloadState) {
-        downloadState = state
-        when (state) {
-            DownloadState.BAIXAR -> {
-                imgDownloadState.setImageResource(R.drawable.ic_dl_arrow)
-                tvDownloadState.text = getProgressText()
-            }
-
-            DownloadState.BAIXANDO -> {
-                imgDownloadState.setImageResource(R.drawable.ic_dl_loading)
-                tvDownloadState.text = getProgressText()
-            }
-
-            DownloadState.BAIXADO -> {
-                imgDownloadState.setImageResource(R.drawable.ic_dl_done)
-                tvDownloadState.text = getProgressText()
-            }
-        }
-        DownloadHelper.setDownloadState(this, "movie_$streamId", state.name)
-    }
-
-    private fun restaurarEstadoDownload() {
-        val stateName = DownloadHelper.getDownloadState(this, "movie_$streamId")
-        val state = try {
-            DownloadState.valueOf(stateName)
-        } catch (_: Exception) {
-            DownloadState.BAIXAR
-        }
-        setDownloadState(state)
-    }
-
-    // -------- FAVORITOS --------
 
     private fun getFavMovies(context: Context): MutableSet<Int> {
         val prefs = context.getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
@@ -291,174 +144,175 @@ class DetailsActivity : AppCompatActivity() {
         btnFavorite.setImageResource(res)
     }
 
-    // -------- JOINHAS (local) --------
-
-    private fun ratingKey(): String = "rating_movie_$streamId"
-
-    private fun getMovieRating(): Int {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        return prefs.getInt(ratingKey(), 0)
-    }
-
-    private fun saveMovieRating(value: Int) {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putInt(ratingKey(), value).apply()
-    }
-
-    private fun onRatingClicked(newValue: Int) {
-        currentRating = if (currentRating == newValue) 0 else newValue
-        saveMovieRating(currentRating)
-        atualizarUiRating()
-    }
-
-    private fun atualizarUiRating() {
-        // Reset visual
-        btnDislike.setImageResource(
-            if (currentRating == -1) R.drawable.ic_dislike_filled else R.drawable.ic_dislike_outline
-        )
-        btnLike.setImageResource(
-            if (currentRating == 1) R.drawable.ic_like_filled else R.drawable.ic_like_outline
-        )
-        btnLove.setImageResource(
-            if (currentRating == 2) R.drawable.ic_love_filled else R.drawable.ic_love_outline
-        )
-
-        tvLikeLabel.visibility = if (currentRating == 0) View.GONE else View.VISIBLE
-        tvLikeLabel.text = when (currentRating) {
-            -1 -> "Não é para mim"
-            1 -> "Gostei"
-            2 -> "Amei!"
-            else -> ""
-        }
-    }
-
-    // -------- DETALHES DO SERVIDOR --------
-
-    private fun carregarDetalhes(streamId: Int) {
+    private fun carregarMovieInfo() {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val username = prefs.getString("username", "") ?: ""
         val password = prefs.getString("password", "") ?: ""
 
-        XtreamApi.service.getVodInfo(username, password, vodId = streamId)
-            .enqueue(object : Callback<VodInfoResponse> {
+        XtreamApi.service.getMovieInfo(username, password, streamId)
+            .enqueue(object : Callback<MovieInfoResponse> {
                 override fun onResponse(
-                    call: Call<VodInfoResponse>,
-                    response: Response<VodInfoResponse>
+                    call: Call<MovieInfoResponse>,
+                    response: Response<MovieInfoResponse>
                 ) {
-                    if (response.isSuccessful && response.body()?.info != null) {
-                        val info = response.body()!!.info!!
+                    if (response.isSuccessful && response.body() != null) {
+                        val body = response.body()!!
 
-                        tvPlot.text = info.plot?.takeIf { it.isNotBlank() }
-                            ?: "Sinopse indisponível."
-                        tvGenre.text = "Gênero: ${
-                            info.genre?.takeIf { it.isNotBlank() }
-                                ?: "Informação não disponível"
-                        }"
-                        tvCast.text = "Elenco: ${
-                            info.cast?.takeIf { it.isNotBlank() }
-                                ?: "Informação não disponível"
-                        }"
-                        tvDirector.text = "Diretor: ${
-                            info.director?.takeIf { it.isNotBlank() }
-                                ?: "Informação não disponível"
-                        }"
-                        tvRating.text = "Nota: ${
-                            info.rating?.takeIf { it.isNotBlank() }
-                                ?: "--"
-                        }"
-
-                        if (!info.movie_image.isNullOrEmpty()) {
-                            Glide.with(this@DetailsActivity)
-                                .load(info.movie_image)
-                                .into(imgPoster)
-                        }
-                    } else {
-                        tvPlot.text = "Sinopse indisponível."
-                        tvGenre.text = "Gênero: Informação não disponível"
-                        tvCast.text = "Elenco: Informação não disponível"
-                        tvDirector.text = "Diretor: Informação não disponível"
-                        tvRating.text = "Nota: --"
+                        tvGenre.text = "Gênero: ${body.info?.genre ?: "..."}"
+                        tvDirector.text =
+                            "Diretor: ${body.info?.director ?: "Informação não disponível"}"
+                        tvCast.text =
+                            "Elenco: ${body.info?.cast ?: "Informação não disponível"}"
+                        tvPlot.text = body.info?.plot ?: "..."
                     }
                 }
 
-                override fun onFailure(call: Call<VodInfoResponse>, t: Throwable) {
-                    tvPlot.text = "Sinopse indisponível."
-                    tvGenre.text = "Gênero: Informação não disponível"
-                    tvCast.text = "Elenco: Informação não disponível"
-                    tvDirector.text = "Diretor: Informação não disponível"
-                    tvRating.text = "Nota: --"
+                override fun onFailure(call: Call<MovieInfoResponse>, t: Throwable) {
+                    Toast.makeText(
+                        this@DetailsActivity,
+                        "Erro de conexão",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             })
     }
 
-    // -------- TMDB --------
-
-    private fun limparTituloBruto(titulo: String): String {
-        return titulo
-            .replace("\\(.*?\\)".toRegex(), " ")
-            .replace(
-                "(?i)\\b(dublado|legendado|dual audio|bluray|bdrip|remux|1080p|720p|4k|h264|x264|x265)\\b"
-                    .toRegex(),
-                " "
-            )
-            .replace(" +".toRegex(), " ")
-            .trim()
+    private fun verificarResume() {
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val keyBase = "movie_resume_$streamId"
+        val pos = prefs.getLong("${keyBase}_pos", 0L)
+        val dur = prefs.getLong("${keyBase}_dur", 0L)
+        val existe = pos > 30_000L && dur > 0L && pos < (dur * 0.95).toLong()
+        btnResume.visibility = if (existe) View.VISIBLE else View.GONE
     }
 
-    private fun carregarDetalhesTmdb(titulo: String) {
-        val apiKey = TmdbConfig.API_KEY
-        if (apiKey.isBlank()) return
+    private fun abrirPlayer(usarResume: Boolean) {
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val keyBase = "movie_resume_$streamId"
+        val pos = prefs.getLong("${keyBase}_pos", 0L)
+        val dur = prefs.getLong("${keyBase}_dur", 0L)
+        val existe = usarResume && pos > 30_000L && dur > 0L && pos < (dur * 0.95).toLong()
 
-        val tituloLimpo = limparTituloBruto(titulo)
+        val intent = Intent(this, PlayerActivity::class.java)
+        intent.putExtra("stream_id", streamId)
+        intent.putExtra("stream_ext", "mkv")
+        intent.putExtra("stream_type", "movie")
+        intent.putExtra("channel_name", name)
+        if (existe) {
+            intent.putExtra("start_position_ms", pos)
+        }
+        startActivity(intent)
+    }
 
-        TmdbApi.service.searchMovie(apiKey, tituloLimpo)
-            .enqueue(object : Callback<TmdbSearchResponse> {
-                override fun onResponse(
-                    call: Call<TmdbSearchResponse>,
-                    response: Response<TmdbSearchResponse>
-                ) {
-                    val movie = response.body()?.results?.firstOrNull() ?: return
+    private fun iniciarDownload() {
+        if (streamId == 0) {
+            Toast.makeText(this, "ID inválido.", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-                    if (tvPlot.text.isNullOrBlank() ||
-                        tvPlot.text.toString().contains("indisponível", ignoreCase = true)
-                    ) {
-                        tvPlot.text = movie.overview ?: "Sinopse indisponível."
-                    }
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val user = prefs.getString("username", "") ?: ""
+        val pass = prefs.getString("password", "") ?: ""
 
-                    if (tvRating.text.isNullOrBlank() ||
-                        tvRating.text.toString().contains("--") ||
-                        tvRating.text.toString().contains("N/A", ignoreCase = true)
-                    ) {
-                        val nota = movie.vote_average ?: 0f
-                        tvRating.text = "Nota: ${String.format("%.1f", nota)}"
-                    }
+        val serverList = listOf(
+            "http://tvblack.shop",
+            "http://firewallnaousardns.xyz:80",
+            "http://fibercdn.sbs"
+        )
+        val server = serverList.first()
 
-                    val ano = movie.release_date?.takeIf { it.length >= 4 }?.substring(0, 4) ?: ""
-                    if (tvGenre.text.isNullOrBlank() ||
-                        tvGenre.text.toString().contains("Informação não disponível") ||
-                        tvGenre.text.toString().contains("...", ignoreCase = true)
-                    ) {
-                        tvGenre.text = if (ano.isNotBlank()) {
-                            "Ano: $ano"
-                        } else {
-                            "Gênero: Informação não disponível"
-                        }
-                    }
+        val url = montarUrlStream(
+            server = server,
+            streamType = "movie",
+            user = user,
+            pass = pass,
+            id = streamId,
+            ext = "mkv"
+        )
 
-                    if (movie.poster_path != null) {
-                        val urlPoster = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
-                        Glide.with(this@DetailsActivity)
-                            .load(urlPoster)
-                            .into(imgPoster)
-                    }
+        val safeTitle = name
+            .replace("[^a-zA-Z0-9 _.-]".toRegex(), "_")
+            .ifBlank { "filme" }
+        val fileName = "${safeTitle}_$streamId.mkv"
+
+        DownloadHelper.enqueueDownload(
+            this,
+            url,
+            fileName,
+            logicalId = "movie_$streamId",
+            type = "movie"
+        )
+
+        Toast.makeText(this, "Baixando filme...", Toast.LENGTH_SHORT).show()
+        setDownloadState(DownloadState.BAIXANDO)
+    }
+
+    private fun mostrarMenuBaixando() {
+        val popup = PopupMenu(this, btnDownloadArea)
+        popup.menu.add("Ir para Meus downloads")
+
+        popup.setOnMenuItemClickListener { item ->
+            when (item.title) {
+                "Ir para Meus downloads" -> {
+                    startActivity(Intent(this, DownloadsActivity::class.java))
+                    true
                 }
 
-                override fun onFailure(
-                    call: Call<TmdbSearchResponse>,
-                    t: Throwable
-                ) {
-                    // silencioso
-                }
-            })
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
+    private fun getProgressText(): String {
+        val progress = DownloadHelper.getDownloadProgress(this, "movie_$streamId")
+        return when (downloadState) {
+            DownloadState.BAIXAR -> "Baixar filme"
+            DownloadState.BAIXANDO -> "Baixando ${progress}%"
+            DownloadState.BAIXADO -> "Baixado 100%"
+        }
+    }
+
+    private fun setDownloadState(state: DownloadState) {
+        downloadState = state
+
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("movie_download_state_$streamId", state.name)
+            .apply()
+
+        when (state) {
+            DownloadState.BAIXAR -> {
+                imgDownloadState.setImageResource(R.drawable.ic_dl_arrow)
+                tvDownloadState.text = getProgressText()
+            }
+
+            DownloadState.BAIXANDO -> {
+                imgDownloadState.setImageResource(R.drawable.ic_dl_loading)
+                tvDownloadState.text = getProgressText()
+            }
+
+            DownloadState.BAIXADO -> {
+                imgDownloadState.setImageResource(R.drawable.ic_dl_done)
+                tvDownloadState.text = getProgressText()
+            }
+        }
+    }
+
+    private fun restaurarEstadoDownload() {
+        if (streamId == 0) {
+            setDownloadState(DownloadState.BAIXAR)
+            return
+        }
+
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val saved =
+            prefs.getString("movie_download_state_$streamId", DownloadState.BAIXAR.name)
+        val state = try {
+            DownloadState.valueOf(saved ?: DownloadState.BAIXAR.name)
+        } catch (_: Exception) {
+            DownloadState.BAIXAR
+        }
+        setDownloadState(state)
     }
 }
