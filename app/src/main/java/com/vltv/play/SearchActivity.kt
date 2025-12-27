@@ -35,15 +35,18 @@ class SearchActivity : AppCompatActivity() {
             when (item.type) {
                 "movie" -> {
                     val i = Intent(this, DetailsActivity::class.java)
-                    i.putExtra("stream_id", item.id)
-                    i.putExtra("stream_ext", "mp4")
-                    i.putExtra("title", item.title)
+                    i.putExtra("stream_id", item.id)                // id do filme
+                    i.putExtra("name", item.title)                  // título que a DetailsActivity usa
+                    i.putExtra("icon", item.iconUrl ?: "")          // capa
+                    i.putExtra("rating", item.extraInfo ?: "0.0")   // nota (se tiver)
                     startActivity(i)
                 }
                 "series" -> {
                     val i = Intent(this, SeriesDetailsActivity::class.java)
-                    i.putExtra("series_id", item.id)
-                    i.putExtra("name", item.title)
+                    i.putExtra("series_id", item.id)                // id da série
+                    i.putExtra("name", item.title)                  // título
+                    i.putExtra("icon", item.iconUrl ?: "")          // capa
+                    i.putExtra("rating", item.extraInfo ?: "0.0")   // nota
                     startActivity(i)
                 }
                 "live" -> {
@@ -113,8 +116,8 @@ class SearchActivity : AppCompatActivity() {
                                     id = vod.id,
                                     title = vod.title ?: vod.name,
                                     type = "movie",
-                                    extraInfo = vod.rating,
-                                    iconUrl = vod.icon
+                                    extraInfo = vod.rating,          // vai em rating
+                                    iconUrl = vod.icon               // vai em icon
                                 )
                             }
                     }
@@ -137,8 +140,8 @@ class SearchActivity : AppCompatActivity() {
                                                 id = s.id,
                                                 title = s.name,
                                                 type = "series",
-                                                extraInfo = s.rating,
-                                                iconUrl = s.icon
+                                                extraInfo = s.rating, // rating da série
+                                                iconUrl = s.icon      // capa da série
                                             )
                                         }
                                 }
