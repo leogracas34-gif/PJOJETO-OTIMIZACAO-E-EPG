@@ -156,8 +156,8 @@ class SeriesActivity : AppCompatActivity() {
         }
 
         val primeiraCategoriaNormal = categorias.firstOrNull { it.id != "FAV_SERIES" }
-        if (primaCategoriaNormal != null) {
-            carregarSeries(primaCategoriaNormal)
+        if (primeiraCategoriaNormal != null) {
+            carregarSeries(primeiraCategoriaNormal)
         } else {
             tvCategoryTitle.text = "FAVORITOS"
             carregarSeriesFavoritas()
