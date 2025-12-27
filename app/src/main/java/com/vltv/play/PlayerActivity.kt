@@ -92,7 +92,6 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        // FULLSCREEN
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
                 View.SYSTEM_UI_FLAG_FULLSCREEN or
@@ -256,13 +255,30 @@ class PlayerActivity : AppCompatActivity() {
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(USER_AGENT)
             .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15000)
+            .setConnectTimeoutMs(12000)
             .setReadTimeoutMs(15000)
 
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
+        val isLive = streamType == "live"
+        val minBufferMs = if (isLive) 5_000 else 15_000
+        val maxBufferMs = if (isLive) 15_000 else 50_000
+        val playBufferMs = if (isLive) 1_500 else 3_000
+        val playRebufferMs = if (isLive) 3_000 else 5_000
+
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                minBufferMs,
+                maxBufferMs,
+                playBufferMs,
+                playRebufferMs
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()  // [web:627][web:628]
+
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
             .build()
 
         playerView.player = player
@@ -299,7 +315,8 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                tentarProximo()
+                loading.visibility = View.VISIBLE
+                handler.postDelayed({ tentarProximo() }, 1000L)  // [web:631][web:616]
             }
         })
     }
@@ -371,8 +388,6 @@ class PlayerActivity : AppCompatActivity() {
             .remove("${getSeriesKey(id)}_dur")
             .apply()
     }
-
-    // ------- EPG live -------
 
     private fun decodeBase64(text: String?): String {
         return try {
