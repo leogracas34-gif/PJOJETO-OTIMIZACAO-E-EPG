@@ -28,6 +28,14 @@ class DetailsActivity : AppCompatActivity() {
     private lateinit var imgDownloadState: ImageView
     private lateinit var tvDownloadState: TextView
 
+    // --- JOINHAS ---
+    private lateinit var tvLikeLabel: TextView
+    private lateinit var btnDislike: ImageButton
+    private lateinit var btnLike: ImageButton
+    private lateinit var btnLove: ImageButton
+    // -1 = não é para mim, 0 = neutro, 1 = gostei, 2 = amei
+    private var currentRating: Int = 0
+
     private var streamId: Int = 0
     private var extension: String = "mp4"
     private var movieTitle: String = "Sem Título"
@@ -58,6 +66,12 @@ class DetailsActivity : AppCompatActivity() {
         btnDownloadArea = findViewById(R.id.btnDownloadArea)
         imgDownloadState = findViewById(R.id.imgDownloadState)
         tvDownloadState = findViewById(R.id.tvDownloadState)
+
+        // --- views dos joinhas ---
+        tvLikeLabel = findViewById(R.id.tvLikeLabel)
+        btnDislike = findViewById(R.id.btnDislike)
+        btnLike = findViewById(R.id.btnLike)
+        btnLove = findViewById(R.id.btnLove)
 
         if (isTelevisionDevice()) {
             btnDownloadArea.visibility = View.GONE
@@ -148,6 +162,14 @@ class DetailsActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // --- JOINHAS: carregar estado salvo e configurar cliques ---
+        currentRating = getMovieRating()
+        atualizarUiRating()
+
+        btnDislike.setOnClickListener { onRatingClicked(-1) }
+        btnLike.setOnClickListener { onRatingClicked(1) }
+        btnLove.setOnClickListener { onRatingClicked(2) }
 
         // Detalhes do painel Xtream
         carregarDetalhes(streamId)
@@ -269,6 +291,47 @@ class DetailsActivity : AppCompatActivity() {
         btnFavorite.setImageResource(res)
     }
 
+    // -------- JOINHAS (local) --------
+
+    private fun ratingKey(): String = "rating_movie_$streamId"
+
+    private fun getMovieRating(): Int {
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        return prefs.getInt(ratingKey(), 0)
+    }
+
+    private fun saveMovieRating(value: Int) {
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putInt(ratingKey(), value).apply()
+    }
+
+    private fun onRatingClicked(newValue: Int) {
+        currentRating = if (currentRating == newValue) 0 else newValue
+        saveMovieRating(currentRating)
+        atualizarUiRating()
+    }
+
+    private fun atualizarUiRating() {
+        // Reset visual
+        btnDislike.setImageResource(
+            if (currentRating == -1) R.drawable.ic_dislike_filled else R.drawable.ic_dislike_outline
+        )
+        btnLike.setImageResource(
+            if (currentRating == 1) R.drawable.ic_like_filled else R.drawable.ic_like_outline
+        )
+        btnLove.setImageResource(
+            if (currentRating == 2) R.drawable.ic_love_filled else R.drawable.ic_love_outline
+        )
+
+        tvLikeLabel.visibility = if (currentRating == 0) View.GONE else View.VISIBLE
+        tvLikeLabel.text = when (currentRating) {
+            -1 -> "Não é para mim"
+            1 -> "Gostei"
+            2 -> "Amei!"
+            else -> ""
+        }
+    }
+
     // -------- DETALHES DO SERVIDOR --------
 
     private fun carregarDetalhes(streamId: Int) {
@@ -356,14 +419,12 @@ class DetailsActivity : AppCompatActivity() {
                 ) {
                     val movie = response.body()?.results?.firstOrNull() ?: return
 
-                    // Sinopse
                     if (tvPlot.text.isNullOrBlank() ||
                         tvPlot.text.toString().contains("indisponível", ignoreCase = true)
                     ) {
                         tvPlot.text = movie.overview ?: "Sinopse indisponível."
                     }
 
-                    // Nota
                     if (tvRating.text.isNullOrBlank() ||
                         tvRating.text.toString().contains("--") ||
                         tvRating.text.toString().contains("N/A", ignoreCase = true)
@@ -372,7 +433,6 @@ class DetailsActivity : AppCompatActivity() {
                         tvRating.text = "Nota: ${String.format("%.1f", nota)}"
                     }
 
-                    // Ano (modelo não tem gêneros, então usa pelo menos o ano)
                     val ano = movie.release_date?.takeIf { it.length >= 4 }?.substring(0, 4) ?: ""
                     if (tvGenre.text.isNullOrBlank() ||
                         tvGenre.text.toString().contains("Informação não disponível") ||
@@ -385,7 +445,6 @@ class DetailsActivity : AppCompatActivity() {
                         }
                     }
 
-                    // Poster TMDB
                     if (movie.poster_path != null) {
                         val urlPoster = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
                         Glide.with(this@DetailsActivity)
