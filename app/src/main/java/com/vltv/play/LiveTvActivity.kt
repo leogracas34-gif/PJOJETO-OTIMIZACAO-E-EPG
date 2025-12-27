@@ -1,11 +1,10 @@
-package com.vltvplay.livetv
+package com.vltv.play
 
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -77,7 +76,6 @@ class LiveTvActivity : AppCompatActivity() {
                                 carregarCanais(categoria)
                             }
                             rvCategories.adapter = categoryAdapter
-                            // Auto carrega primeira categoria
                             carregarCanais(currentCategories[0])
                         }
                     } else {
@@ -124,12 +122,11 @@ class LiveTvActivity : AppCompatActivity() {
             })
     }
     
-    // CategoryAdapter (sem mudanças)
+    // CategoryAdapter
     class CategoryAdapter(
         private val list: List<LiveCategory>,
         private val onClick: (LiveCategory) -> Unit
     ) : RecyclerView.Adapter<CategoryAdapter.VH>() {
-        
         private var selectedPos = 0
         
         class VH(v: View) : RecyclerView.ViewHolder(v) {
@@ -137,8 +134,7 @@ class LiveTvActivity : AppCompatActivity() {
         }
         
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_category, parent, false)
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_category, parent, false)
             return VH(v)
         }
         
@@ -165,7 +161,7 @@ class LiveTvActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
     
-    // ChannelAdapter OTIMIZADO (LAZY EPG + NO TIMEOUT)
+    // ChannelAdapter OTIMIZADO
     class ChannelAdapter(
         private val list: List<LiveStream>,
         private val username: String,
@@ -203,7 +199,6 @@ class LiveTvActivity : AppCompatActivity() {
                 .centerCrop()
                 .into(holder.imgLogo)
             
-            // LAZY LOADING EPG - só carrega visíveis + cache
             carregarEpgLazy(holder, item, position)
             holder.itemView.setOnClickListener { onClick(item) }
         }
@@ -211,13 +206,11 @@ class LiveTvActivity : AppCompatActivity() {
         private fun carregarEpgLazy(holder: VH, canal: LiveStream, position: Int) {
             val channelId = canal.id
             
-            // Cache primeiro
             epgCache[channelId]?.let { epg ->
                 mostrarEpg(holder, epg)
                 return
             }
             
-            // Só carrega EPG para: primeiros 9 canais OU visíveis no scroll
             val shouldLoadEpg = position < 9 || (position < firstVisibleItem + visibleItemCount + 3)
             
             if (!shouldLoadEpg) {
@@ -226,14 +219,12 @@ class LiveTvActivity : AppCompatActivity() {
                 return
             }
             
-            // Evita múltiplas chamadas
             if (loadingChannels.contains(channelId)) return
             loadingChannels.add(channelId)
             
             holder.tvNow.text = "EPG..."
             holder.tvNext.text = ""
             
-            // DELAY PROGRESSIVO para evitar timeout (0ms, 150ms, 300ms...)
             val delay = (position * 150L).coerceAtMost(2000L)
             Handler(Looper.getMainLooper()).postDelayed({
                 carregarEpgReal(holder, canal)
@@ -274,7 +265,7 @@ class LiveTvActivity : AppCompatActivity() {
         private fun mostrarEpg(holder: VH, epg: List<EpgResponseItem>) {
             if (epg.isNotEmpty()) {
                 val agora = epg[0]
-                holder.tvNow.text = decodeBase64(agora.title).take(22) + "..."
+                holder.tvNow.text = decodeBase64(agora.title).take(22) + if (decodeBase64(agora.title).length > 22) "..." else ""
                 
                 if (epg.size > 1) {
                     val proximo = epg[1]
