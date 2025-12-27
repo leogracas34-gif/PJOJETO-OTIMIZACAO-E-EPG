@@ -10,7 +10,6 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -40,14 +39,6 @@ class SeriesDetailsActivity : AppCompatActivity() {
     private lateinit var tvDownloadEpisodeState: TextView
 
     private lateinit var btnDownloadSeason: Button
-
-    // --- JOINHAS SÉRIE ---
-    private lateinit var tvLikeLabelSeries: TextView
-    private lateinit var btnSeriesDislike: ImageButton
-    private lateinit var btnSeriesLike: ImageButton
-    private lateinit var btnSeriesLove: ImageButton
-    // -1 = não é para mim, 0 = neutro, 1 = gostei, 2 = amei
-    private var currentRatingSeries: Int = 0
 
     private var episodesBySeason: Map<String, List<EpisodeStream>> = emptyMap()
     private var sortedSeasons: List<String> = emptyList()
@@ -82,12 +73,6 @@ class SeriesDetailsActivity : AppCompatActivity() {
         tvDownloadEpisodeState = findViewById(R.id.tvDownloadSeriesState)
 
         btnDownloadSeason = findViewById(R.id.btnDownloadSeason)
-
-        // JOINHAS
-        tvLikeLabelSeries = findViewById(R.id.tvLikeLabelSeries)
-        btnSeriesDislike = findViewById(R.id.btnSeriesDislike)
-        btnSeriesLike = findViewById(R.id.btnSeriesLike)
-        btnSeriesLove = findViewById(R.id.btnSeriesLove)
 
         if (isTelevisionDevice()) {
             btnDownloadEpisodeArea.visibility = View.GONE
@@ -182,7 +167,7 @@ class SeriesDetailsActivity : AppCompatActivity() {
                 }
 
                 DownloadState.BAIXANDO -> {
-                    val popup = PopupMenu(this, btnDownloadEpisodeArea)
+                    val popup = androidx.appcompat.widget.PopupMenu(this, btnDownloadEpisodeArea)
                     popup.menu.add("Ir para Meus downloads")
 
                     popup.setOnMenuItemClickListener { item ->
@@ -227,14 +212,6 @@ class SeriesDetailsActivity : AppCompatActivity() {
                 .show()
         }
 
-        // JOINHAS: carregar estado salvo e listeners
-        currentRatingSeries = getSeriesRating()
-        atualizarUiSeriesRating()
-
-        btnSeriesDislike.setOnClickListener { onSeriesRatingClicked(-1) }
-        btnSeriesLike.setOnClickListener { onSeriesRatingClicked(1) }
-        btnSeriesLove.setOnClickListener { onSeriesRatingClicked(2) }
-
         carregarSeriesInfo()
     }
 
@@ -259,47 +236,6 @@ class SeriesDetailsActivity : AppCompatActivity() {
     private fun atualizarIconeFavoritoSerie(isFav: Boolean) {
         val res = if (isFav) R.drawable.ic_star_filled else R.drawable.ic_star_border
         btnFavoriteSeries.setImageResource(res)
-    }
-
-    // -------- JOINHAS SÉRIE (local) --------
-
-    private fun seriesRatingKey(): String = "rating_series_$seriesId"
-
-    private fun getSeriesRating(): Int {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        return prefs.getInt(seriesRatingKey(), 0)
-    }
-
-    private fun saveSeriesRating(value: Int) {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putInt(seriesRatingKey(), value).apply()
-    }
-
-    private fun onSeriesRatingClicked(newValue: Int) {
-        currentRatingSeries = if (currentRatingSeries == newValue) 0 else newValue
-        saveSeriesRating(currentRatingSeries)
-        atualizarUiSeriesRating()
-    }
-
-    private fun atualizarUiSeriesRating() {
-        btnSeriesDislike.setImageResource(
-            if (currentRatingSeries == -1) R.drawable.ic_dislike_filled else R.drawable.ic_dislike_outline
-        )
-        btnSeriesLike.setImageResource(
-            if (currentRatingSeries == 1) R.drawable.ic_like_filled else R.drawable.ic_like_outline
-        )
-        btnSeriesLove.setImageResource(
-            if (currentRatingSeries == 2) R.drawable.ic_love_filled else R.drawable.ic_love_outline
-        )
-
-        tvLikeLabelSeries.visibility =
-            if (currentRatingSeries == 0) View.GONE else View.VISIBLE
-        tvLikeLabelSeries.text = when (currentRatingSeries) {
-            -1 -> "Não é para mim"
-            1 -> "Gostei"
-            2 -> "Amei!"
-            else -> ""
-        }
     }
 
     private fun carregarSeriesInfo() {
@@ -505,7 +441,9 @@ class SeriesDetailsActivity : AppCompatActivity() {
 
     private fun restaurarEstadoDownload() {
         val ep = currentEpisode ?: run {
-            setDownloadState(DownloadState.BAIXAR, null)
+            downloadState = DownloadState.BAIXAR
+            imgDownloadEpisodeState.setImageResource(R.drawable.ic_dl_arrow)
+            tvDownloadEpisodeState.text = "Baixar episódio"
             return
         }
         val episodeId = ep.id.toIntOrNull() ?: 0
