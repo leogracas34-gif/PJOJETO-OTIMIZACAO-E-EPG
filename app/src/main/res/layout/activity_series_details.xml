@@ -168,6 +168,57 @@
                 android:tint="#FFFFFF" />
         </LinearLayout>
 
+        <!-- JOINHAS SÉRIE -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <!-- Label do rating -->
+            <TextView
+                android:id="@+id/tvLikeLabelSeries"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                android:text="Gostei" />
+
+            <!-- Botões das joinhas -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/btnSeriesDislike"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_dislike_outline" />
+
+                <ImageButton
+                    android:id="@+id/btnSeriesLike"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_like_outline" />
+
+                <ImageButton
+                    android:id="@+id/btnSeriesLove"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_love_outline" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- LISTA DE EPISÓDIOS -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvEpisodes"
