@@ -18,9 +18,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 import java.nio.charset.Charset
 
 class LiveTvActivity : AppCompatActivity() {
@@ -66,8 +63,8 @@ class LiveTvActivity : AppCompatActivity() {
     private fun carregarCategorias() {
         progressBar.visibility = View.VISIBLE
         XtreamApi.service.getLiveCategories(username, password)
-            .enqueue(object : Callback<List<LiveCategory>> {
-                override fun onResponse(call: Call<List<LiveCategory>>, response: Response<List<LiveCategory>>) {
+            .enqueue(object : retrofit2.Callback<List<LiveCategory>> {
+                override fun onResponse(call: retrofit2.Call<List<LiveCategory>>, response: retrofit2.Response<List<LiveCategory>>) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
                         currentCategories = response.body()!!
@@ -83,7 +80,7 @@ class LiveTvActivity : AppCompatActivity() {
                     }
                 }
                 
-                override fun onFailure(call: Call<List<LiveCategory>>, t: Throwable) {
+                override fun onFailure(call: retrofit2.Call<List<LiveCategory>>, t: Throwable) {
                     progressBar.visibility = View.GONE
                     Toast.makeText(this@LiveTvActivity, "Falha de conexão", Toast.LENGTH_SHORT).show()
                 }
@@ -94,9 +91,9 @@ class LiveTvActivity : AppCompatActivity() {
         progressBar.visibility = View.VISIBLE
         tvCategoryTitle.text = categoria.name
         
-        XtreamApi.service.getLiveStreams(username, password, categoria.id.toString())
-            .enqueue(object : Callback<List<LiveStream>> {
-                override fun onResponse(call: Call<List<LiveStream>>, response: Response<List<LiveStream>>) {
+        XtreamApi.service.getLiveStreams(username, password, categoria.id)
+            .enqueue(object : retrofit2.Callback<List<LiveStream>> {
+                override fun onResponse(call: retrofit2.Call<List<LiveStream>>, response: retrofit2.Response<List<LiveStream>>) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
                         val canais = response.body()!!
@@ -115,7 +112,7 @@ class LiveTvActivity : AppCompatActivity() {
                     }
                 }
                 
-                override fun onFailure(call: Call<List<LiveStream>>, t: Throwable) {
+                override fun onFailure(call: retrofit2.Call<List<LiveStream>>, t: Throwable) {
                     progressBar.visibility = View.GONE
                     Toast.makeText(this@LiveTvActivity, "Falha de conexão", Toast.LENGTH_SHORT).show()
                 }
@@ -161,7 +158,7 @@ class LiveTvActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
     
-    // ChannelAdapter OTIMIZADO
+    // ChannelAdapter OTIMIZADO (usa sua API exata)
     class ChannelAdapter(
         private val list: List<LiveStream>,
         private val username: String,
@@ -171,8 +168,6 @@ class LiveTvActivity : AppCompatActivity() {
         
         private val epgCache = mutableMapOf<Int, List<EpgResponseItem>>()
         private val loadingChannels = mutableSetOf<Int>()
-        private var firstVisibleItem = 0
-        private var visibleItemCount = 0
         
         class VH(v: View) : RecyclerView.ViewHolder(v) {
             val tvName: TextView = v.findViewById(R.id.tvName)
@@ -206,14 +201,14 @@ class LiveTvActivity : AppCompatActivity() {
         private fun carregarEpgLazy(holder: VH, canal: LiveStream, position: Int) {
             val channelId = canal.id
             
+            // Cache primeiro
             epgCache[channelId]?.let { epg ->
                 mostrarEpg(holder, epg)
                 return
             }
             
-            val shouldLoadEpg = position < 9 || (position < firstVisibleItem + visibleItemCount + 3)
-            
-            if (!shouldLoadEpg) {
+            // Lazy loading: só primeiros 12 + delay progressivo
+            if (position >= 12) {
                 holder.tvNow.text = "Toque canal"
                 holder.tvNext.text = ""
                 return
@@ -225,29 +220,31 @@ class LiveTvActivity : AppCompatActivity() {
             holder.tvNow.text = "EPG..."
             holder.tvNext.text = ""
             
-            val delay = (position * 150L).coerceAtMost(2000L)
+            // Delay para evitar timeout (0ms, 200ms, 400ms...)
+            val delay = (position * 200L)
             Handler(Looper.getMainLooper()).postDelayed({
-                carregarEpgReal(holder, canal)
+                carregarEpg(holder, canal)
             }, delay)
         }
         
-        private fun carregarEpgReal(holder: VH, canal: LiveStream) {
-            val channelId = canal.id
-            loadingChannels.remove(channelId)
+        private fun carregarEpg(holder: VH, canal: LiveStream) {
+            val epgChannelId = canal.epg_channel_id ?: canal.id.toString()
             
-            XtreamApi.service.getShortEpg(username, password, channelId.toString(), 3)
-                .enqueue(object : Callback<EpgResponseWrapper> {
-                    override fun onResponse(call: Call<EpgResponseWrapper>, response: Response<EpgResponseWrapper>) {
+            XtreamApi.service.getShortEpg(username, password, epgChannelId, 3)
+                .enqueue(object : retrofit2.Callback<EpgWrapper> {
+                    override fun onResponse(call: retrofit2.Call<EpgWrapper>, response: retrofit2.Response<EpgWrapper>) {
+                        loadingChannels.remove(canal.id)
                         if (response.isSuccessful && response.body()?.epg_listings != null) {
                             val epg = response.body()!!.epg_listings!!
-                            epgCache[channelId] = epg
+                            epgCache[canal.id] = epg
                             mostrarEpg(holder, epg)
                         } else {
                             mostrarEpgVazio(holder)
                         }
                     }
                     
-                    override fun onFailure(call: Call<EpgResponseWrapper>, t: Throwable) {
+                    override fun onFailure(call: retrofit2.Call<EpgWrapper>, t: Throwable) {
+                        loadingChannels.remove(canal.id)
                         mostrarEpgVazio(holder)
                     }
                 })
@@ -265,11 +262,13 @@ class LiveTvActivity : AppCompatActivity() {
         private fun mostrarEpg(holder: VH, epg: List<EpgResponseItem>) {
             if (epg.isNotEmpty()) {
                 val agora = epg[0]
-                holder.tvNow.text = decodeBase64(agora.title).take(22) + if (decodeBase64(agora.title).length > 22) "..." else ""
+                val nowTitle = decodeBase64(agora.title).take(20)
+                holder.tvNow.text = if (nowTitle.length < 20) nowTitle else "$nowTitle..."
                 
                 if (epg.size > 1) {
                     val proximo = epg[1]
-                    holder.tvNext.text = decodeBase64(proximo.title).take(18)
+                    val nextTitle = decodeBase64(proximo.title).take(16)
+                    holder.tvNext.text = if (nextTitle.length < 16) nextTitle else "$nextTitle..."
                 }
             } else {
                 mostrarEpgVazio(holder)
