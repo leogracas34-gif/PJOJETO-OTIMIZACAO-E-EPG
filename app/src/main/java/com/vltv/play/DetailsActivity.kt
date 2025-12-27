@@ -2,16 +2,12 @@ package com.vltv.play
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
 import com.bumptech.glide.Glide
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 
 class DetailsActivity : AppCompatActivity() {
 
@@ -104,7 +100,6 @@ class DetailsActivity : AppCompatActivity() {
         }
 
         restaurarEstadoDownload()
-
         btnDownloadArea.setOnClickListener {
             when (downloadState) {
                 DownloadState.BAIXAR -> iniciarDownload()
@@ -116,7 +111,6 @@ class DetailsActivity : AppCompatActivity() {
             }
         }
 
-        carregarMovieInfo()
         verificarResume()
     }
 
@@ -125,6 +119,8 @@ class DetailsActivity : AppCompatActivity() {
         restaurarEstadoDownload()
         verificarResume()
     }
+
+    // -------- Favoritos --------
 
     private fun getFavMovies(context: Context): MutableSet<Int> {
         val prefs = context.getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
@@ -144,38 +140,7 @@ class DetailsActivity : AppCompatActivity() {
         btnFavorite.setImageResource(res)
     }
 
-    private fun carregarMovieInfo() {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val username = prefs.getString("username", "") ?: ""
-        val password = prefs.getString("password", "") ?: ""
-
-        XtreamApi.service.getMovieInfo(username, password, streamId)
-            .enqueue(object : Callback<MovieInfoResponse> {
-                override fun onResponse(
-                    call: Call<MovieInfoResponse>,
-                    response: Response<MovieInfoResponse>
-                ) {
-                    if (response.isSuccessful && response.body() != null) {
-                        val body = response.body()!!
-
-                        tvGenre.text = "Gênero: ${body.info?.genre ?: "..."}"
-                        tvDirector.text =
-                            "Diretor: ${body.info?.director ?: "Informação não disponível"}"
-                        tvCast.text =
-                            "Elenco: ${body.info?.cast ?: "Informação não disponível"}"
-                        tvPlot.text = body.info?.plot ?: "..."
-                    }
-                }
-
-                override fun onFailure(call: Call<MovieInfoResponse>, t: Throwable) {
-                    Toast.makeText(
-                        this@DetailsActivity,
-                        "Erro de conexão",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            })
-    }
+    // -------- Resume / Player --------
 
     private fun verificarResume() {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
@@ -203,6 +168,8 @@ class DetailsActivity : AppCompatActivity() {
         }
         startActivity(intent)
     }
+
+    // -------- Download --------
 
     private fun iniciarDownload() {
         if (streamId == 0) {
@@ -257,7 +224,6 @@ class DetailsActivity : AppCompatActivity() {
                     startActivity(Intent(this, DownloadsActivity::class.java))
                     true
                 }
-
                 else -> false
             }
         }
@@ -286,12 +252,10 @@ class DetailsActivity : AppCompatActivity() {
                 imgDownloadState.setImageResource(R.drawable.ic_dl_arrow)
                 tvDownloadState.text = getProgressText()
             }
-
             DownloadState.BAIXANDO -> {
                 imgDownloadState.setImageResource(R.drawable.ic_dl_loading)
                 tvDownloadState.text = getProgressText()
             }
-
             DownloadState.BAIXADO -> {
                 imgDownloadState.setImageResource(R.drawable.ic_dl_done)
                 tvDownloadState.text = getProgressText()
